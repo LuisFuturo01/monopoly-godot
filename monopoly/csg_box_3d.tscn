@@ -4,9 +4,3 @@
 
 [node name="Node3D" type="Node3D" unique_id=1879631028]
 script = ExtResource("1_bhx6w")
-
-[node name="Camera3D" type="Camera3D" parent="." unique_id=2093792098]
-transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 12, 12)
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=407658030]
-transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 15, 15)

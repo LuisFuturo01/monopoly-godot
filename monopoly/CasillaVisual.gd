@@ -4,272 +4,239 @@ extends Node3D
 var data: CasillaData
 var mesh_base: MeshInstance3D
 var mesh_banda: MeshInstance3D
+var mesh_borde: MeshInstance3D
 var indicador_dueno: MeshInstance3D
 var contenedor_casas: Node3D
-var contenedor_icono: Node3D
 var label_nombre: Label3D
 var label_precio: Label3D
 
+const CASILLA_W: float = 1.28
+const CASILLA_D: float = 1.68
+const CASILLA_H: float = 0.35
+const ESQUINA_SIZE: float = 1.68
+const BANDA_H: float = 0.44
+const BORDE_GROSOR: float = 0.035
+
 func setup(p_data: CasillaData, es_esquina: bool = false) -> void:
 	data = p_data
-	
+
 	contenedor_casas = Node3D.new()
-	contenedor_casas.name = "ContenedorCasas"
+	contenedor_casas.name = "Casas"
 	add_child(contenedor_casas)
-	
-	contenedor_icono = Node3D.new()
-	contenedor_icono.name = "ContenedorIcono"
-	add_child(contenedor_icono)
-	
-	# Malla Base de la Casilla
+
+	var w = ESQUINA_SIZE if es_esquina else CASILLA_W
+	var d = ESQUINA_SIZE if es_esquina else CASILLA_D
+
+	# ── Borde fino negro que separa casillas ──
+	mesh_borde = MeshInstance3D.new()
+	var box_borde = BoxMesh.new()
+	box_borde.size = Vector3(w + BORDE_GROSOR * 2, CASILLA_H, d + BORDE_GROSOR * 2)
+	mesh_borde.mesh = box_borde
+	var mat_borde = StandardMaterial3D.new()
+	mat_borde.albedo_color = Color(0.12, 0.12, 0.12)
+	mat_borde.roughness = 0.6
+	mesh_borde.material_override = mat_borde
+	mesh_borde.position = Vector3(0, CASILLA_H * 0.5, 0)
+	add_child(mesh_borde)
+
+	# ── Base Interior ──
 	mesh_base = MeshInstance3D.new()
 	var box_base = BoxMesh.new()
-	
-	if es_esquina:
-		box_base.size = Vector3(1.7, 0.16, 1.7)
-	else:
-		box_base.size = Vector3(1.3, 0.16, 1.7)
-		
+	box_base.size = Vector3(w, CASILLA_H + 0.02, d)
 	mesh_base.mesh = box_base
-	
 	var mat_base = StandardMaterial3D.new()
-	mat_base.roughness = 0.2
-	mat_base.specular = 0.5
-	
-	if data.id == 0: # SALIDA
-		mat_base.albedo_color = Color(0.08, 0.65, 0.28)
-	elif data.id == 10: # CÁRCEL
-		mat_base.albedo_color = Color(0.85, 0.48, 0.12)
-	elif data.id == 20: # PARKING
-		mat_base.albedo_color = Color(0.12, 0.5, 0.85)
-	elif data.id == 30: # IR CÁRCEL
-		mat_base.albedo_color = Color(0.88, 0.15, 0.15)
-	elif data.tipo in ["suerte", "arca"]:
-		mat_base.albedo_color = Color(0.96, 0.94, 0.88)
-	elif data.tipo == "impuesto":
-		mat_base.albedo_color = Color(0.92, 0.9, 0.92)
-	else:
-		mat_base.albedo_color = Color(0.98, 0.97, 0.94)
-		
+	mat_base.roughness = 0.35
+	mat_base.albedo_color = _color_base(es_esquina)
 	mesh_base.material_override = mat_base
-	mesh_base.position = Vector3(0, 0.08, 0)
+	mesh_base.position = Vector3(0, CASILLA_H * 0.5 + 0.01, 0)
 	add_child(mesh_base)
-	
-	# Banda de Color para Calles
+
+	# ── Banda de color del grupo (calles) ──
 	if data.tipo == "calle":
 		mesh_banda = MeshInstance3D.new()
 		var box_banda = BoxMesh.new()
-		box_banda.size = Vector3(1.3, 0.02, 0.48)
+		box_banda.size = Vector3(w, 0.05, BANDA_H)
 		mesh_banda.mesh = box_banda
-		
 		var mat_banda = StandardMaterial3D.new()
 		mat_banda.albedo_color = data.color_grupo
-		mat_banda.roughness = 0.2
+		mat_banda.roughness = 0.15
+		mat_banda.emission_enabled = true
+		mat_banda.emission = data.color_grupo.lightened(0.15)
+		mat_banda.emission_energy_multiplier = 0.35
 		mesh_banda.material_override = mat_banda
-		mesh_banda.position = Vector3(0, 0.17, 0.55)
+		mesh_banda.position = Vector3(0, CASILLA_H + 0.03, d * 0.5 - BANDA_H * 0.5)
 		add_child(mesh_banda)
-		
-	# Indicador de Propietario (Placa resplandeciente)
+
+	# ── Indicador propietario ──
 	indicador_dueno = MeshInstance3D.new()
-	var box_dueno = BoxMesh.new()
-	box_dueno.size = Vector3(1.31, 0.04, 0.16) if not es_esquina else Vector3(1.71, 0.04, 0.16)
-	indicador_dueno.mesh = box_dueno
-	indicador_dueno.position = Vector3(0, 0.17, -0.76)
+	var box_d = BoxMesh.new()
+	box_d.size = Vector3(w, 0.06, 0.14)
+	indicador_dueno.mesh = box_d
+	indicador_dueno.position = Vector3(0, CASILLA_H + 0.035, -d * 0.5 - 0.02)
 	indicador_dueno.visible = false
 	add_child(indicador_dueno)
-	
-	# Iconos y Detalle Visual 3D
-	_crear_icono_casilla()
-	
-	# Label3D de Nombre de Alta Nitidez
+
+	# ── Textos ──
+	_crear_nombre(w, d, es_esquina)
+	_crear_precio(w, d, es_esquina)
+
+func _color_base(es_esquina: bool) -> Color:
+	match data.tipo:
+		"salida":    return Color(0.82, 0.96, 0.84)
+		"carcel":    return Color(0.96, 0.85, 0.65)
+		"parking":   return Color(0.78, 0.9, 0.98)
+		"ir_carcel": return Color(0.98, 0.76, 0.76)
+		"suerte":    return Color(0.98, 0.93, 0.8)
+		"arca":      return Color(0.82, 0.9, 0.98)
+		"impuesto":  return Color(0.93, 0.93, 0.9)
+		"estacion":  return Color(0.92, 0.92, 0.9)
+		"servicio":  return Color(0.92, 0.92, 0.9)
+		_:           return Color(0.95, 0.96, 0.92)
+
+func _crear_nombre(w: float, d: float, es_esquina: bool) -> void:
 	label_nombre = Label3D.new()
 	label_nombre.text = data.nombre
-	label_nombre.font_size = 18
-	label_nombre.pixel_size = 0.003
+	label_nombre.font_size = 36 if es_esquina else 28
+	label_nombre.pixel_size = 0.008 if es_esquina else 0.006
+	label_nombre.width = w / label_nombre.pixel_size * 0.9
+	label_nombre.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label_nombre.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label_nombre.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label_nombre.no_depth_test = true
 	label_nombre.render_priority = 10
 	label_nombre.shaded = false
 	label_nombre.double_sided = true
-	label_nombre.modulate = Color(0.0, 0.0, 0.0)
-	label_nombre.outline_modulate = Color(1.0, 1.0, 1.0)
-	label_nombre.outline_size = 4
+	label_nombre.modulate = Color(0.05, 0.05, 0.05)
+	label_nombre.outline_modulate = Color(1.0, 1.0, 0.98)
+	label_nombre.outline_size = 8
 	label_nombre.rotation = Vector3(-PI / 2, 0, 0)
-	label_nombre.position = Vector3(0, 0.22, 0.15 if data.tipo == "calle" else -0.1)
+
+	match data.tipo:
+		"calle":
+			label_nombre.position = Vector3(0, CASILLA_H + 0.045, -0.1)
+		"salida", "carcel", "parking", "ir_carcel":
+			label_nombre.position = Vector3(0, CASILLA_H + 0.045, 0.15)
+		_:
+			label_nombre.position = Vector3(0, CASILLA_H + 0.045, -0.1)
 	add_child(label_nombre)
-	
-	# Label3D de Precio de Alta Nitidez
+
+func _crear_precio(w: float, d: float, es_esquina: bool) -> void:
 	if data is PropiedadCasillaData:
 		var prop = data as PropiedadCasillaData
 		label_precio = Label3D.new()
 		label_precio.text = "$" + str(prop.precio)
-		label_precio.font_size = 16
-		label_precio.pixel_size = 0.003
+		label_precio.font_size = 24
+		label_precio.pixel_size = 0.006
 		label_precio.no_depth_test = true
 		label_precio.render_priority = 10
 		label_precio.shaded = false
 		label_precio.double_sided = true
-		label_precio.modulate = Color(0.1, 0.45, 0.1)
-		label_precio.outline_modulate = Color(1.0, 1.0, 1.0)
-		label_precio.outline_size = 4
+		label_precio.modulate = Color(0.0, 0.35, 0.0)
+		label_precio.outline_modulate = Color(1.0, 1.0, 0.98)
+		label_precio.outline_size = 6
 		label_precio.rotation = Vector3(-PI / 2, 0, 0)
-		label_precio.position = Vector3(0, 0.22, -0.55)
+		label_precio.position = Vector3(0, CASILLA_H + 0.045, -d * 0.5 + 0.32)
 		add_child(label_precio)
 
-func _crear_icono_casilla() -> void:
-	match data.tipo:
-		"estacion":
-			var loco = MeshInstance3D.new()
-			var box = BoxMesh.new()
-			box.size = Vector3(0.35, 0.16, 0.5)
-			loco.mesh = box
-			
-			var mat = StandardMaterial3D.new()
-			mat.albedo_color = Color(0.15, 0.15, 0.2)
-			mat.metallic = 0.8
-			loco.material_override = mat
-			loco.position = Vector3(0, 0.24, 0.15)
-			contenedor_icono.add_child(loco)
-			
-			var lbl_st = Label3D.new()
-			lbl_st.text = "🚂 TREN"
-			lbl_st.font_size = 18
-			lbl_st.pixel_size = 0.003
-			lbl_st.no_depth_test = true
-			lbl_st.render_priority = 10
-			lbl_st.shaded = false
-			lbl_st.modulate = Color.BLACK
-			lbl_st.outline_modulate = Color.WHITE
-			lbl_st.outline_size = 4
-			lbl_st.rotation = Vector3(-PI / 2, 0, 0)
-			lbl_st.position = Vector3(0, 0.22, 0.38)
-			contenedor_icono.add_child(lbl_st)
-			
-		"servicio":
-			var foco = MeshInstance3D.new()
-			var sphere = SphereMesh.new()
-			sphere.radius = 0.16
-			sphere.height = 0.32
-			foco.mesh = sphere
-			
-			var mat = StandardMaterial3D.new()
-			mat.albedo_color = Color(0.95, 0.85, 0.1) if data.id == 12 else Color(0.15, 0.6, 0.95)
-			mat.emission_enabled = true
-			mat.emission = mat.albedo_color
-			mat.emission_energy_multiplier = 0.8
-			foco.material_override = mat
-			foco.position = Vector3(0, 0.26, 0.15)
-			contenedor_icono.add_child(foco)
-			
-		"suerte", "arca":
-			var lbl_q = Label3D.new()
-			lbl_q.text = "❓" if data.tipo == "suerte" else "📦"
-			lbl_q.font_size = 36
-			lbl_q.pixel_size = 0.0035
-			lbl_q.no_depth_test = true
-			lbl_q.render_priority = 10
-			lbl_q.shaded = false
-			lbl_q.rotation = Vector3(-PI / 2, 0, 0)
-			lbl_q.position = Vector3(0, 0.22, 0.25)
-			contenedor_icono.add_child(lbl_q)
-			
-		"impuesto":
-			var moneda = MeshInstance3D.new()
-			var cyl = CylinderMesh.new()
-			cyl.top_radius = 0.18
-			cyl.bottom_radius = 0.18
-			cyl.height = 0.12
-			moneda.mesh = cyl
-			
-			var mat = StandardMaterial3D.new()
-			mat.albedo_color = Color(0.95, 0.8, 0.15)
-			mat.metallic = 0.9
-			mat.roughness = 0.1
-			moneda.material_override = mat
-			moneda.position = Vector3(0, 0.22, 0.18)
-			contenedor_icono.add_child(moneda)
-			
-			var lbl_tax = Label3D.new()
-			lbl_tax.text = "PAGA $" + str(200 if data.id == 4 else 100)
-			lbl_tax.font_size = 14
-			lbl_tax.pixel_size = 0.003
-			lbl_tax.no_depth_test = true
-			lbl_tax.render_priority = 10
-			lbl_tax.shaded = false
-			lbl_tax.modulate = Color(0.85, 0.1, 0.1)
-			lbl_tax.outline_modulate = Color.WHITE
-			lbl_tax.outline_size = 3
-			lbl_tax.rotation = Vector3(-PI / 2, 0, 0)
-			lbl_tax.position = Vector3(0, 0.22, -0.45)
-			contenedor_icono.add_child(lbl_tax)
-			
-		"salida":
-			var flecha = Label3D.new()
-			flecha.text = "🟢 SALIDA\nCobras $200"
-			flecha.font_size = 22
-			flecha.pixel_size = 0.0035
-			flecha.no_depth_test = true
-			flecha.render_priority = 10
-			flecha.shaded = false
-			flecha.modulate = Color(0.1, 0.9, 0.2)
-			flecha.outline_modulate = Color.BLACK
-			flecha.outline_size = 5
-			flecha.rotation = Vector3(-PI / 2, 0, 0)
-			flecha.position = Vector3(0, 0.22, 0.0)
-			contenedor_icono.add_child(flecha)
-			
-		"parking":
-			var sign_p = Label3D.new()
-			sign_p.text = "🅿️ PARKING\nGRATUITO"
-			sign_p.font_size = 18
-			sign_p.pixel_size = 0.003
-			sign_p.no_depth_test = true
-			sign_p.render_priority = 10
-			sign_p.shaded = false
-			sign_p.modulate = Color(0.15, 0.5, 0.9)
-			sign_p.outline_modulate = Color.WHITE
-			sign_p.outline_size = 4
-			sign_p.rotation = Vector3(-PI / 2, 0, 0)
-			sign_p.position = Vector3(0, 0.22, 0.0)
-			contenedor_icono.add_child(sign_p)
+	# Texto especial para esquinas y tipos sin precio
+	if data.tipo in ["salida", "parking", "carcel", "ir_carcel", "suerte", "arca", "impuesto"]:
+		var lbl_extra = Label3D.new()
+		lbl_extra.font_size = 24 if not es_esquina else 28
+		lbl_extra.pixel_size = 0.007 if es_esquina else 0.006
+		lbl_extra.no_depth_test = true
+		lbl_extra.render_priority = 10
+		lbl_extra.shaded = false
+		lbl_extra.double_sided = true
+		lbl_extra.outline_size = 6
+		lbl_extra.rotation = Vector3(-PI / 2, 0, 0)
+
+		match data.tipo:
+			"salida":
+				lbl_extra.text = "Cobras $200"
+				lbl_extra.modulate = Color(0.0, 0.5, 0.15)
+				lbl_extra.outline_modulate = Color(1,1,1)
+				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+			"parking":
+				lbl_extra.text = "Descanso"
+				lbl_extra.modulate = Color(0.1, 0.35, 0.7)
+				lbl_extra.outline_modulate = Color(1,1,1)
+				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+			"carcel":
+				lbl_extra.text = "De visita"
+				lbl_extra.modulate = Color(0.5, 0.3, 0.1)
+				lbl_extra.outline_modulate = Color(1,1,1)
+				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+			"ir_carcel":
+				lbl_extra.text = "Ve directo"
+				lbl_extra.modulate = Color(0.7, 0.1, 0.1)
+				lbl_extra.outline_modulate = Color(1,1,1)
+				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+			"suerte":
+				lbl_extra.text = "?"
+				lbl_extra.font_size = 42
+				lbl_extra.pixel_size = 0.008
+				lbl_extra.modulate = Color(0.85, 0.45, 0.05)
+				lbl_extra.outline_modulate = Color(1,0.95,0.85)
+				lbl_extra.outline_size = 8
+				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, 0.28)
+			"arca":
+				lbl_extra.text = "?"
+				lbl_extra.font_size = 42
+				lbl_extra.pixel_size = 0.008
+				lbl_extra.modulate = Color(0.1, 0.35, 0.7)
+				lbl_extra.outline_modulate = Color(0.85,0.92,1)
+				lbl_extra.outline_size = 8
+				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, 0.28)
+			"impuesto":
+				var monto = 200 if data.id == 4 else 100
+				lbl_extra.text = "Paga $%d" % monto
+				lbl_extra.modulate = Color(0.7, 0.15, 0.15)
+				lbl_extra.outline_modulate = Color(1,1,1)
+				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, 0.28)
+		add_child(lbl_extra)
 
 func actualizar_propietario(color_propietario: Color) -> void:
-	if not indicador_dueno: return
+	if not indicador_dueno:
+		return
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = color_propietario
 	mat.emission_enabled = true
 	mat.emission = color_propietario
-	mat.emission_energy_multiplier = 0.6
+	mat.emission_energy_multiplier = 0.8
 	indicador_dueno.material_override = mat
 	indicador_dueno.visible = true
 
 func actualizar_casas(num_casas: int) -> void:
 	for child in contenedor_casas.get_children():
 		child.queue_free()
-		
-	if num_casas <= 0: return
-	
+	if num_casas <= 0:
+		return
+
 	if num_casas == 5:
 		var hotel = MeshInstance3D.new()
 		var box = BoxMesh.new()
-		box.size = Vector3(0.42, 0.22, 0.28)
+		box.size = Vector3(0.46, 0.26, 0.32)
 		hotel.mesh = box
-		
 		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.9, 0.12, 0.12)
+		mat.albedo_color = Color(0.88, 0.12, 0.12)
 		mat.roughness = 0.3
+		mat.emission_enabled = true
+		mat.emission = Color(0.5, 0.05, 0.05)
+		mat.emission_energy_multiplier = 0.4
 		hotel.material_override = mat
-		hotel.position = Vector3(0, 0.27, 0.55)
+		hotel.position = Vector3(0, CASILLA_H + 0.14, CASILLA_D * 0.5 - BANDA_H * 0.5)
 		contenedor_casas.add_child(hotel)
 	else:
+		var spacing = CASILLA_W / (num_casas + 1)
 		for i in range(num_casas):
 			var casa = MeshInstance3D.new()
 			var box = BoxMesh.new()
 			box.size = Vector3(0.18, 0.18, 0.18)
 			casa.mesh = box
-			
 			var mat = StandardMaterial3D.new()
-			mat.albedo_color = Color(0.1, 0.75, 0.2)
+			mat.albedo_color = Color(0.15, 0.72, 0.25)
 			mat.roughness = 0.3
 			casa.material_override = mat
-			casa.position = Vector3(-0.42 + (i * 0.26), 0.26, 0.55)
+			var x_off = -CASILLA_W * 0.5 + spacing * (i + 1)
+			casa.position = Vector3(x_off, CASILLA_H + 0.1, CASILLA_D * 0.5 - BANDA_H * 0.5)
 			contenedor_casas.add_child(casa)
