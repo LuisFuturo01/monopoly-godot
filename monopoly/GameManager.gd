@@ -49,14 +49,29 @@ var btn_pasar: Button
 var detalle_modal: PanelContainer
 var detalle_vb_contenido: VBoxContainer
 
+# Modal interactivo de carta 3D
+var carta_overlay_bg: Button
+var carta_header_panel: PanelContainer
+var carta_header_label: Label
+var btn_cerrar_carta: Button
+var mostrando_carta_modal: bool = false
+var _carta_mesh_activa: MeshInstance3D
+var _carta_orig_pos: Vector3
+var _carta_orig_rot: Vector3
+var _carta_orig_scale: Vector3
+
 # Botón principal
 var btn_tirar: Button
 
 # Player 3D tags en la mesa
 var player_tags3d: Array[Label3D] = []
 
+# Base de datos de cartas JSON
+var cartas_db: Dictionary = {}
+
 func _ready() -> void:
 	randomize()
+	_cargar_cartas_json()
 	_setup_camara()
 
 	tablero_manager = TableroManager.new()
@@ -69,6 +84,21 @@ func _ready() -> void:
 	_construir_ui()
 	_actualizar_hud()
 	_notificar("🎲 ¡Bienvenido a Monopoly 3D!")
+
+func _cargar_cartas_json() -> void:
+	var rutas = [
+		"res://cartas_monopoly.json",
+		"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/cartas_monopoly.json"
+	]
+	for r in rutas:
+		if FileAccess.file_exists(r):
+			var file = FileAccess.open(r, FileAccess.READ)
+			if file:
+				var json_text = file.get_as_text()
+				var json = JSON.new()
+				if json.parse(json_text) == OK and json.data is Dictionary:
+					cartas_db = json.data
+					return
 
 func _setup_camara() -> void:
 	camara = Camera3D.new()
@@ -319,22 +349,62 @@ func _animar_dados(d1: int, d2: int, total: int, callback: Callable) -> void:
 			tw_throw.chain().tween_property(dado1_3d, "rotation", rot_final1, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 			tw_throw.tween_property(dado2_3d, "rotation", rot_final2, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
-			# FASE 3: Una vez asentados en el tablero -> Mostrar HUD nítido
+			# FASE 3: Los dados 3D crecen y se deslicen hacia la pantalla (frente a la cámara)
 			tw_throw.chain().tween_callback(func():
-				var caras = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-				dado1_label.text = caras[d1 - 1]
-				dado2_label.text = caras[d2 - 1]
-				dados_msg.text = jug.nombre + " — ¡Avanza %d casillas!" % total
+				var cam_tf = camara.global_transform
+				var cam_pos = cam_tf.origin
+				var forward = -cam_tf.basis.z
+				var right = cam_tf.basis.x
+				var up = cam_tf.basis.y
+
+				# Posicionar los dados 3D flotando a 2.4m frente a la cámara
+				var center_screen = cam_pos + forward * 2.4 + up * 0.1
+				var pos_dado1_cam = center_screen - right * 0.52
+				var pos_dado2_cam = center_screen + right * 0.52
+
+				# Inclinación ligera hacia el espectador para destacar la cara superior con el número
+				var rot_cam1 = rot_final1 + Vector3(deg_to_rad(22), 0, 0)
+				var rot_cam2 = rot_final2 + Vector3(deg_to_rad(22), 0, 0)
+
+				var tw_slide = create_tween().set_parallel(true)
+				tw_slide.tween_property(dado1_3d, "global_position", pos_dado1_cam, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw_slide.tween_property(dado2_3d, "global_position", pos_dado2_cam, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+				# Crecimiento de los dados 3D hacia la pantalla
+				tw_slide.tween_property(dado1_3d, "scale", Vector3(1.75, 1.75, 1.75), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw_slide.tween_property(dado2_3d, "scale", Vector3(1.75, 1.75, 1.75), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+				# Orientación ajustada para lectura perfecta
+				tw_slide.tween_property(dado1_3d, "rotation", rot_cam1, 0.45)
+				tw_slide.tween_property(dado2_3d, "rotation", rot_cam2, 0.45)
+
+				# Desplegar el modal como marco informativo debajo de los dados 3D reales
+				dados_msg.text = "%s — Sacó %d + %d  ➜  ¡Avanza %d casillas!" % [jug.nombre, d1, d2, total]
 				dados_panel.visible = true
+				dados_panel.pivot_offset = dados_panel.size * 0.5
+				dados_panel.scale = Vector2(0.8, 0.8)
+				dados_panel.modulate.a = 0.0
+
+				var tw_panel = create_tween().set_parallel(true)
+				tw_panel.tween_property(dados_panel, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw_panel.tween_property(dados_panel, "modulate:a", 1.0, 0.25)
 
 				var tw_wait = create_tween()
-				tw_wait.tween_interval(1.1)
+				tw_wait.tween_interval(1.2)
 				tw_wait.tween_callback(func():
-					dados_panel.visible = false
-					dado1_3d.visible = false
-					dado2_3d.visible = false
-					if callback.is_valid():
-						callback.call()
+					# Encoger dados 3D y desvanecer modal antes de avanzar la ficha
+					var tw_out = create_tween().set_parallel(true)
+					tw_out.tween_property(dado1_3d, "scale", Vector3.ZERO, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+					tw_out.tween_property(dado2_3d, "scale", Vector3.ZERO, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+					tw_out.tween_property(dados_panel, "modulate:a", 0.0, 0.25)
+
+					tw_out.chain().tween_callback(func():
+						dados_panel.visible = false
+						dado1_3d.visible = false
+						dado2_3d.visible = false
+						if callback.is_valid():
+							callback.call()
+					)
 				)
 			)
 		)
@@ -382,11 +452,14 @@ func _al_llegar(jug: JugadorData, pos_ant: int, nueva: int, dados: int) -> void:
 				jug.modificar_dinero(-prop.costo_casa)
 				prop.agregar_casa()
 				cas.nodo_visual.actualizar_casas(prop.casas)
+				_crear_efecto_particulas_compra(cas.nodo_visual.global_position)
 				_notificar("🏠 " + jug.nombre + " construyó en " + prop.nombre.replace("\n", " "))
 	elif cas.tipo == "suerte":
-		_evento_suerte(jug)
+		_animar_carta_3d(tablero_manager.mazo_suerte_top, jug, "suerte")
+		return
 	elif cas.tipo == "arca":
-		_evento_arca(jug)
+		_animar_carta_3d(tablero_manager.mazo_arca_top, jug, "arca")
+		return
 	elif cas.tipo == "impuesto":
 		var m = 200 if cas.id == 4 else 100
 		jug.modificar_dinero(-m)
@@ -415,6 +488,7 @@ func _on_comprar() -> void:
 			prop.propietario_id = jug.id
 			jug.agregar_propiedad(prop)
 			cas.nodo_visual.actualizar_propietario(jug.color_ficha)
+			_crear_efecto_particulas_compra(cas.nodo_visual.global_position)
 			_notificar("📜 " + jug.nombre + " compró " + prop.nombre.replace("\n", " "))
 	_fin_turno()
 
@@ -428,25 +502,209 @@ func _fin_turno() -> void:
 	btn_tirar.disabled = false
 	_actualizar_hud()
 
-func _evento_suerte(jug: JugadorData) -> void:
-	var evs = [
-		{"t": "Lotería — Ganas $150", "m": 150},
-		{"t": "Multa de tránsito — Pagas $50", "m": -50},
-		{"t": "Reembolso bancario — Ganas $100", "m": 100}
-	]
-	var e = evs.pick_random()
-	jug.modificar_dinero(e["m"])
-	_notificar("❓ " + e["t"])
+var _es_carta_temp: bool = false
 
-func _evento_arca(jug: JugadorData) -> void:
-	var evs = [
-		{"t": "Venta de acciones — Ganas $200", "m": 200},
-		{"t": "Gastos médicos — Pagas $100", "m": -100},
-		{"t": "Regalo — Ganas $50", "m": 50}
-	]
-	var e = evs.pick_random()
-	jug.modificar_dinero(e["m"])
-	_notificar("♦ " + e["t"])
+func _crear_carta_3d_dinamica(tipo: String) -> MeshInstance3D:
+	var card_mesh = MeshInstance3D.new()
+	var box = BoxMesh.new()
+	box.size = Vector3(2.30, 0.03, 1.50)
+	card_mesh.mesh = box
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.12, 0.38, 0.72) if tipo == "arca" else Color(0.88, 0.5, 0.08)
+	mat.roughness = 0.95
+	card_mesh.material_override = mat
+	add_child(card_mesh)
+	card_mesh.global_position = Vector3(-3.8 if tipo == "arca" else 3.8, 0.15, 3.0)
+	card_mesh.global_rotation = Vector3.ZERO
+	return card_mesh
+
+func _animar_carta_3d(top_mesh: MeshInstance3D, jug: JugadorData, tipo: String) -> void:
+	# Obtener datos de la carta desde JSON
+	var lista_cartas = cartas_db.get(tipo, [])
+	var carta_data: Dictionary = {}
+	if not lista_cartas.is_empty():
+		carta_data = lista_cartas.pick_random()
+	else:
+		carta_data = {"texto": "¡Evento especial!\nGanas $100.", "monto": 100, "tipo_accion": "dinero"}
+
+	if not top_mesh:
+		top_mesh = _crear_carta_3d_dinamica(tipo)
+		_es_carta_temp = true
+	else:
+		_es_carta_temp = false
+
+	# Ocultar el título impreso del mazo en la tarjeta para que no tape el contenido
+	var lbl_deck = top_mesh.get_node_or_null("LabelTituloMazo")
+	if lbl_deck:
+		lbl_deck.visible = false
+
+	# Label3D impreso directamente sobre la cara de la carta 3D
+	var lbl_txt: Label3D = top_mesh.get_node_or_null("LabelTextoCarta")
+	if not lbl_txt:
+		lbl_txt = Label3D.new()
+		lbl_txt.name = "LabelTextoCarta"
+		lbl_txt.position = Vector3(0, 0.022, 0)
+		lbl_txt.rotation = Vector3(-PI / 2, 0, 0)
+		lbl_txt.font_size = 28
+		lbl_txt.pixel_size = 0.0045
+		lbl_txt.width = 2.2 / 0.0045 * 0.85
+		lbl_txt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl_txt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_txt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl_txt.modulate = Color(0.08, 0.08, 0.08) # Tinta oscura de tarjeta
+		lbl_txt.outline_modulate = Color(1.0, 1.0, 0.95)
+		lbl_txt.outline_size = 6
+		lbl_txt.no_depth_test = false
+		lbl_txt.render_priority = 4
+		top_mesh.add_child(lbl_txt)
+
+	lbl_txt.text = carta_data["texto"]
+	lbl_txt.visible = true
+
+	# Eliminar brillos y reflejos deslumbrantes para una lectura cómoda mate en pantalla
+	if top_mesh.material_override and top_mesh.material_override is StandardMaterial3D:
+		var mat_read = top_mesh.material_override.duplicate() as StandardMaterial3D
+		mat_read.emission_enabled = false
+		mat_read.roughness = 0.95
+		mat_read.metallic = 0.0
+		top_mesh.material_override = mat_read
+
+	_carta_mesh_activa = top_mesh
+	_carta_orig_pos = top_mesh.global_position
+	_carta_orig_rot = top_mesh.global_rotation
+	_carta_orig_scale = top_mesh.scale
+
+	# FASE 1: Ojeado / Extracción lateral del mazo 3D
+	var tw_pull = create_tween().set_parallel(true)
+	tw_pull.tween_property(top_mesh, "global_position:y", _carta_orig_pos.y + 0.35, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw_pull.tween_property(top_mesh, "global_position:x", _carta_orig_pos.x + (0.35 if tipo == "suerte" else -0.35), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	tw_pull.chain().tween_callback(func():
+		# FASE 2: Deslizamiento hacia la pantalla alineándose sin inclinación (plano 3D a 2D)
+		var cam_tf = camara.global_transform
+		var cam_pos = cam_tf.origin
+		var forward = -cam_tf.basis.z
+
+		# Posición plana frente a la cámara (a 2.0m de distancia)
+		var pos_card_cam = cam_pos + forward * 2.0
+
+		# Orientación alineada plana al plano de la cámara (sin inclinación para lectura perfecta)
+		var rot_card_flat = cam_tf.basis.get_euler() + Vector3(PI / 2, 0, 0)
+
+		var tw_slide = create_tween().set_parallel(true)
+		tw_slide.tween_property(top_mesh, "global_position", pos_card_cam, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw_slide.tween_property(top_mesh, "scale", Vector3(2.1, 2.1, 2.1), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw_slide.tween_property(top_mesh, "global_rotation", rot_card_flat, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+		tw_slide.chain().tween_callback(func():
+			# FASE 3: Aplicar el efecto de la carta y desplegar Header superior + Botón de Cierre "✖"
+			_ejecutar_evento_carta(jug, tipo, carta_data)
+
+			var titulo_hdr = "❓ CASUALIDAD" if tipo == "suerte" else "♦ ARCA COMUNAL"
+			var col_hdr = Color(1.0, 0.65, 0.15) if tipo == "suerte" else Color(0.25, 0.65, 1.0)
+			carta_header_label.text = titulo_hdr
+			carta_header_label.add_theme_color_override("font_color", col_hdr)
+
+			carta_overlay_bg.visible = true
+			carta_header_panel.visible = true
+			btn_cerrar_carta.visible = true
+			mostrando_carta_modal = true
+		)
+	)
+
+func _on_cerrar_carta_clicked() -> void:
+	if not mostrando_carta_modal or not _carta_mesh_activa:
+		return
+	mostrando_carta_modal = false
+
+	carta_overlay_bg.visible = false
+	carta_header_panel.visible = false
+	btn_cerrar_carta.visible = false
+
+	var lbl_txt: Label3D = _carta_mesh_activa.get_node_or_null("LabelTextoCarta")
+	if lbl_txt:
+		lbl_txt.visible = false
+
+	# Restaurar material de brillo original para el mazo en el tablero
+	if _carta_mesh_activa.material_override and _carta_mesh_activa.material_override is StandardMaterial3D:
+		_carta_mesh_activa.material_override.roughness = 0.25
+		_carta_mesh_activa.material_override.emission_enabled = true
+
+	# FASE 4: Regresar la carta al mazo 3D
+	var tw_return = create_tween().set_parallel(true)
+	tw_return.tween_property(_carta_mesh_activa, "global_position", _carta_orig_pos, 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw_return.tween_property(_carta_mesh_activa, "scale", _carta_orig_scale, 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw_return.tween_property(_carta_mesh_activa, "global_rotation", _carta_orig_rot, 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+
+	tw_return.chain().tween_callback(func():
+		var lbl_deck = _carta_mesh_activa.get_node_or_null("LabelTituloMazo")
+		if lbl_deck:
+			lbl_deck.visible = true
+		if _es_carta_temp and is_instance_valid(_carta_mesh_activa):
+			_carta_mesh_activa.queue_free()
+		_fin_turno()
+	)
+
+func _ejecutar_evento_carta(jug: JugadorData, tipo: String, carta_data: Dictionary) -> void:
+	if not carta_data or carta_data.is_empty():
+		return
+	var monto = carta_data.get("monto", 0)
+	var accion = carta_data.get("tipo_accion", "dinero")
+
+	if monto != 0:
+		jug.modificar_dinero(monto)
+
+	if accion == "salida":
+		jug.posicion = 0
+		jug.nodo_ficha.position = tablero_manager.obtener_posicion_casilla_con_offset(0, jug.id, jugadores.size())
+		jug.modificar_dinero(200)
+	elif accion == "carcel":
+		jug.posicion = 10
+		jug.en_carcel = true
+		jug.nodo_ficha.position = tablero_manager.obtener_posicion_casilla_con_offset(10, jug.id, jugadores.size())
+
+	var nom_tipo = "Casualidad" if tipo == "suerte" else "Arca Comunal"
+	_notificar("🃏 " + jug.nombre + " robó carta de " + nom_tipo)
+
+func _crear_efecto_particulas_compra(pos: Vector3) -> void:
+	var particle = GPUParticles3D.new()
+	var mat = ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 0.4
+	mat.direction = Vector3(0, 1, 0)
+	mat.spread = 60.0
+	mat.initial_velocity_min = 1.5
+	mat.initial_velocity_max = 3.0
+	mat.gravity = Vector3(0, -2.5, 0)
+	mat.color = Color(1.0, 0.85, 0.2)
+	mat.scale_min = 0.08
+	mat.scale_max = 0.18
+
+	particle.process_material = mat
+	particle.amount = 24
+	particle.lifetime = 0.8
+	particle.one_shot = true
+	particle.position = pos + Vector3(0, 0.4, 0)
+
+	var p_mesh = QuadMesh.new()
+	p_mesh.size = Vector2(0.12, 0.12)
+	var p_mat = StandardMaterial3D.new()
+	p_mat.albedo_color = Color(1.0, 0.88, 0.3)
+	p_mat.emission_enabled = true
+	p_mat.emission = Color(1.0, 0.88, 0.3)
+	p_mat.emission_energy_multiplier = 2.0
+	p_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	p_mesh.material = p_mat
+
+	particle.draw_pass_1 = p_mesh
+	add_child(particle)
+	particle.restart()
+
+	var tw = create_tween()
+	tw.tween_interval(1.0)
+	tw.tween_callback(func(): particle.queue_free())
+
+
 
 # ─────────────────────────────────────────────────────────────────────
 #   UI
@@ -478,6 +736,76 @@ func _construir_ui() -> void:
 	canvas = CanvasLayer.new()
 	add_child(canvas)
 
+	# ── Modal Interactivo de Carta 3D (Overlay + Header + Botón de Cierre "✖") ──
+	carta_overlay_bg = Button.new()
+	carta_overlay_bg.anchor_left = 0.0
+	carta_overlay_bg.anchor_top = 0.0
+	carta_overlay_bg.anchor_right = 1.0
+	carta_overlay_bg.anchor_bottom = 1.0
+	carta_overlay_bg.flat = true
+	var style_overlay = StyleBoxFlat.new()
+	style_overlay.bg_color = Color(0, 0, 0, 0.45)
+	carta_overlay_bg.add_theme_stylebox_override("normal", style_overlay)
+	carta_overlay_bg.add_theme_stylebox_override("hover", style_overlay)
+	carta_overlay_bg.add_theme_stylebox_override("pressed", style_overlay)
+	carta_overlay_bg.visible = false
+	carta_overlay_bg.pressed.connect(_on_cerrar_carta_clicked)
+	canvas.add_child(carta_overlay_bg)
+
+	carta_header_panel = PanelContainer.new()
+	carta_header_panel.anchor_left = 0.32
+	carta_header_panel.anchor_top = 0.10
+	carta_header_panel.anchor_right = 0.68
+	carta_header_panel.anchor_bottom = 0.17
+	carta_header_panel.visible = false
+	var style_hdr = StyleBoxFlat.new()
+	style_hdr.bg_color = Color(0.06, 0.09, 0.16, 0.94)
+	style_hdr.border_color = Color(0.85, 0.72, 0.25, 0.85)
+	style_hdr.set_border_width_all(2)
+	style_hdr.set_corner_radius_all(14)
+	style_hdr.set_content_margin_all(8)
+	style_hdr.shadow_color = Color(0, 0, 0, 0.6)
+	style_hdr.shadow_size = 10
+	carta_header_panel.add_theme_stylebox_override("panel", style_hdr)
+	canvas.add_child(carta_header_panel)
+
+	carta_header_label = Label.new()
+	carta_header_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	carta_header_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	carta_header_label.add_theme_font_size_override("font_size", 20)
+	carta_header_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.3))
+	carta_header_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	carta_header_label.add_theme_constant_override("outline_size", 4)
+	carta_header_panel.add_child(carta_header_label)
+
+	btn_cerrar_carta = Button.new()
+	btn_cerrar_carta.text = "✖"
+	btn_cerrar_carta.anchor_left = 0.71
+	btn_cerrar_carta.anchor_top = 0.14
+	btn_cerrar_carta.anchor_right = 0.75
+	btn_cerrar_carta.anchor_bottom = 0.20
+	btn_cerrar_carta.add_theme_font_size_override("font_size", 20)
+	btn_cerrar_carta.visible = false
+
+	var style_close = StyleBoxFlat.new()
+	style_close.bg_color = Color(0.85, 0.18, 0.18, 0.95)
+	style_close.border_color = Color(1.0, 0.88, 0.3)
+	style_close.set_border_width_all(2)
+	style_close.set_corner_radius_all(20)
+	style_close.shadow_color = Color(0, 0, 0, 0.6)
+	style_close.shadow_size = 8
+	btn_cerrar_carta.add_theme_stylebox_override("normal", style_close)
+
+	var style_close_h = StyleBoxFlat.new()
+	style_close_h.bg_color = Color(0.98, 0.25, 0.25, 1.0)
+	style_close_h.border_color = Color(1.0, 0.95, 0.5)
+	style_close_h.set_border_width_all(2)
+	style_close_h.set_corner_radius_all(20)
+	btn_cerrar_carta.add_theme_stylebox_override("hover", style_close_h)
+
+	btn_cerrar_carta.pressed.connect(_on_cerrar_carta_clicked)
+	canvas.add_child(btn_cerrar_carta)
+
 	# ── Notificación ──
 	notif_label = Label.new()
 	notif_label.anchor_left = 0.15
@@ -494,20 +822,23 @@ func _construir_ui() -> void:
 	notif_label.add_theme_constant_override("outline_size", 8)
 	canvas.add_child(notif_label)
 
-	# ── Dados centro ──
+	# ── Dados centro (Glassmorphism Modal de marco 3D) ──
 	dados_panel = PanelContainer.new()
-	dados_panel.anchor_left = 0.39
-	dados_panel.anchor_top = 0.37
-	dados_panel.anchor_right = 0.61
-	dados_panel.anchor_bottom = 0.55
+	dados_panel.anchor_left = 0.25
+	dados_panel.anchor_top = 0.65
+	dados_panel.anchor_right = 0.75
+	dados_panel.anchor_bottom = 0.78
 	dados_panel.visible = false
 
 	var style_dados = StyleBoxFlat.new()
-	style_dados.bg_color = Color(0.08, 0.1, 0.14, 0.92)
-	style_dados.border_color = Color(0.82, 0.65, 0.18)
-	style_dados.set_border_width_all(3)
-	style_dados.set_corner_radius_all(16)
-	style_dados.set_content_margin_all(16)
+	style_dados.bg_color = Color(0.06, 0.09, 0.16, 0.88)
+	style_dados.border_color = Color(0.85, 0.72, 0.25, 0.85)
+	style_dados.set_border_width_all(2)
+	style_dados.set_corner_radius_all(18)
+	style_dados.set_content_margin_all(14)
+	style_dados.shadow_color = Color(0, 0, 0, 0.6)
+	style_dados.shadow_size = 18
+	style_dados.shadow_offset = Vector2(0, 6)
 	dados_panel.add_theme_stylebox_override("panel", style_dados)
 	canvas.add_child(dados_panel)
 
@@ -516,70 +847,74 @@ func _construir_ui() -> void:
 	dados_panel.add_child(vb_d)
 
 	var titulo_dados = Label.new()
-	titulo_dados.text = "🎲 DADOS"
+	titulo_dados.text = "🎲 RESULTADO DEL LANZAMIENTO"
 	titulo_dados.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	titulo_dados.add_theme_font_size_override("font_size", 16)
-	titulo_dados.add_theme_color_override("font_color", Color(0.82, 0.65, 0.18))
+	titulo_dados.add_theme_font_size_override("font_size", 14)
+	titulo_dados.add_theme_color_override("font_color", Color(0.95, 0.82, 0.3))
 	vb_d.add_child(titulo_dados)
-
-	var hb_d = HBoxContainer.new()
-	hb_d.alignment = BoxContainer.ALIGNMENT_CENTER
-	hb_d.add_theme_constant_override("separation", 32)
-	vb_d.add_child(hb_d)
-
-	dado1_label = Label.new()
-	dado1_label.text = "⚀"
-	dado1_label.add_theme_font_size_override("font_size", 48)
-	dado1_label.add_theme_color_override("font_color", Color.WHITE)
-	hb_d.add_child(dado1_label)
-
-	dado2_label = Label.new()
-	dado2_label.text = "⚀"
-	dado2_label.add_theme_font_size_override("font_size", 48)
-	dado2_label.add_theme_color_override("font_color", Color.WHITE)
-	hb_d.add_child(dado2_label)
 
 	dados_msg = Label.new()
 	dados_msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dados_msg.add_theme_font_size_override("font_size", 17)
-	dados_msg.add_theme_color_override("font_color", Color(0.9, 0.88, 0.75))
+	dados_msg.add_theme_font_size_override("font_size", 18)
+	dados_msg.add_theme_color_override("font_color", Color(0.95, 0.96, 1.0))
+	dados_msg.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	dados_msg.add_theme_constant_override("outline_size", 4)
 	vb_d.add_child(dados_msg)
 
-	# ── Botón tirar ──
+	# ── Botón Tirar Dados de Lujo con profundidad y brillo dorado ──
 	btn_tirar = Button.new()
 	btn_tirar.text = "🎲  TIRAR DADOS"
-	btn_tirar.anchor_left = 0.38
-	btn_tirar.anchor_top = 0.87
-	btn_tirar.anchor_right = 0.62
+	btn_tirar.anchor_left = 0.37
+	btn_tirar.anchor_top = 0.86
+	btn_tirar.anchor_right = 0.63
 	btn_tirar.anchor_bottom = 0.95
 	btn_tirar.add_theme_font_size_override("font_size", 19)
 
 	var style_btn = StyleBoxFlat.new()
-	style_btn.bg_color = Color(0.82, 0.15, 0.15)
-	style_btn.set_corner_radius_all(10)
+	style_btn.bg_color = Color(0.85, 0.15, 0.18)
+	style_btn.border_color = Color(1.0, 0.84, 0.3)
+	style_btn.set_border_width_all(2)
+	style_btn.set_corner_radius_all(14)
 	style_btn.set_content_margin_all(8)
+	style_btn.shadow_color = Color(0.5, 0.05, 0.05, 0.6)
+	style_btn.shadow_size = 10
+	style_btn.shadow_offset = Vector2(0, 4)
 	btn_tirar.add_theme_stylebox_override("normal", style_btn)
+
 	var style_btn_h = StyleBoxFlat.new()
-	style_btn_h.bg_color = Color(0.95, 0.2, 0.2)
-	style_btn_h.set_corner_radius_all(10)
+	style_btn_h.bg_color = Color(0.98, 0.22, 0.25)
+	style_btn_h.border_color = Color(1.0, 0.92, 0.5)
+	style_btn_h.set_border_width_all(2)
+	style_btn_h.set_corner_radius_all(14)
 	style_btn_h.set_content_margin_all(8)
+	style_btn_h.shadow_color = Color(0.7, 0.1, 0.1, 0.7)
+	style_btn_h.shadow_size = 14
+	style_btn_h.shadow_offset = Vector2(0, 5)
 	btn_tirar.add_theme_stylebox_override("hover", style_btn_h)
+
 	var style_btn_p = StyleBoxFlat.new()
-	style_btn_p.bg_color = Color(0.65, 0.1, 0.1)
-	style_btn_p.set_corner_radius_all(10)
+	style_btn_p.bg_color = Color(0.6, 0.08, 0.1)
+	style_btn_p.border_color = Color(0.8, 0.65, 0.2)
+	style_btn_p.set_border_width_all(2)
+	style_btn_p.set_corner_radius_all(14)
 	style_btn_p.set_content_margin_all(8)
+	style_btn_p.shadow_size = 2
+	style_btn_p.shadow_offset = Vector2(0, 1)
 	btn_tirar.add_theme_stylebox_override("pressed", style_btn_p)
+
 	var style_btn_d = StyleBoxFlat.new()
-	style_btn_d.bg_color = Color(0.25, 0.25, 0.3)
-	style_btn_d.set_corner_radius_all(10)
+	style_btn_d.bg_color = Color(0.2, 0.22, 0.28, 0.8)
+	style_btn_d.border_color = Color(0.35, 0.38, 0.45, 0.5)
+	style_btn_d.set_border_width_all(1)
+	style_btn_d.set_corner_radius_all(14)
 	style_btn_d.set_content_margin_all(8)
 	btn_tirar.add_theme_stylebox_override("disabled", style_btn_d)
 	btn_tirar.add_theme_color_override("font_color", Color.WHITE)
-	btn_tirar.add_theme_color_override("font_disabled_color", Color(0.45, 0.45, 0.5))
+	btn_tirar.add_theme_color_override("font_disabled_color", Color(0.5, 0.52, 0.58))
 	btn_tirar.pressed.connect(ejecutar_turno)
 	canvas.add_child(btn_tirar)
 
-	# ── Panel compra ──
+	# ── Panel compra (Glassmorphism) ──
 	compra_panel = PanelContainer.new()
 	compra_panel.anchor_left = 0.28
 	compra_panel.anchor_top = 0.35
@@ -588,11 +923,14 @@ func _construir_ui() -> void:
 	compra_panel.visible = false
 
 	var style_compra = StyleBoxFlat.new()
-	style_compra.bg_color = Color(0.06, 0.08, 0.12, 0.95)
-	style_compra.border_color = Color(0.2, 0.7, 0.3)
-	style_compra.set_border_width_all(3)
-	style_compra.set_corner_radius_all(14)
+	style_compra.bg_color = Color(0.06, 0.09, 0.16, 0.92)
+	style_compra.border_color = Color(0.2, 0.75, 0.35, 0.8)
+	style_compra.set_border_width_all(2)
+	style_compra.set_corner_radius_all(16)
 	style_compra.set_content_margin_all(20)
+	style_compra.shadow_color = Color(0, 0, 0, 0.5)
+	style_compra.shadow_size = 14
+	style_compra.shadow_offset = Vector2(0, 6)
 	compra_panel.add_theme_stylebox_override("panel", style_compra)
 	canvas.add_child(compra_panel)
 

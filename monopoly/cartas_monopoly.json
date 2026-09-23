@@ -1,0 +1,66 @@
+{
+  "casualidad": [
+    {
+      "id": 1,
+      "texto": "¡Avance hasta SALIDA!\nCobras $200 de bonificación.",
+      "monto": 200,
+      "tipo_accion": "salida"
+    },
+    {
+      "id": 2,
+      "texto": "¡Exceso de velocidad!\nMulta de tránsito de $50.",
+      "monto": -50,
+      "tipo_accion": "dinero"
+    },
+    {
+      "id": 3,
+      "texto": "¡Reembolso fiscal!\nEl gobierno te devuelve $150.",
+      "monto": 150,
+      "tipo_accion": "dinero"
+    },
+    {
+      "id": 4,
+      "texto": "¡Premio de lotería!\nHas ganado $100 en el sorteo.",
+      "monto": 100,
+      "tipo_accion": "dinero"
+    },
+    {
+      "id": 5,
+      "texto": "¡Ve a la CÁRCEL!\nSin pasar por la SALIDA.",
+      "monto": 0,
+      "tipo_accion": "carcel"
+    }
+  ],
+  "arca": [
+    {
+      "id": 1,
+      "texto": "¡Error bancario a tu favor!\nRecibes $200 en tu cuenta.",
+      "monto": 200,
+      "tipo_accion": "dinero"
+    },
+    {
+      "id": 2,
+      "texto": "¡Gastos de hospital!\nDebes pagar $100 por consulta.",
+      "monto": -100,
+      "tipo_accion": "dinero"
+    },
+    {
+      "id": 3,
+      "texto": "¡Venta de acciones!\nObtienes $150 de rentabilidad.",
+      "monto": 150,
+      "tipo_accion": "dinero"
+    },
+    {
+      "id": 4,
+      "texto": "¡Regalo de cumpleaños!\nCada fondo te otorga $50.",
+      "monto": 50,
+      "tipo_accion": "dinero"
+    },
+    {
+      "id": 5,
+      "texto": "¡Pago de colegiatura!\nDebes abonar $150 de matrícula.",
+      "monto": -150,
+      "tipo_accion": "dinero"
+    }
+  ]
+}

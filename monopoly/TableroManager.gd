@@ -5,8 +5,13 @@ var casillas_data: Array[CasillaData] = []
 var casillas_visuales: Array[CasillaVisual] = []
 var contenedor_visual: Node3D
 
-const TABLERO_ANCHO: float = 13.5
-const CASILLAS_POR_LADO: int = 10
+const ESQUINA_SIZE: float = 1.68
+const CASILLA_W: float = 1.28
+const MITAD_TABLERO: float = (9.0 * CASILLA_W + ESQUINA_SIZE) / 2.0 # 6.60
+const TABLERO_ANCHO: float = MITAD_TABLERO * 2.0 # 13.20
+
+var mazo_arca_top: MeshInstance3D
+var mazo_suerte_top: MeshInstance3D
 
 func construir_tablero() -> Array[CasillaData]:
 	contenedor_visual = Node3D.new()
@@ -18,9 +23,6 @@ func construir_tablero() -> Array[CasillaData]:
 	_crear_base_tablero()
 	_crear_centro()
 
-	var paso = TABLERO_ANCHO / float(CASILLAS_POR_LADO)
-	var mitad = TABLERO_ANCHO / 2.0
-
 	for i in range(40):
 		var datos = _crear_datos_casilla(i)
 		casillas_data.append(datos)
@@ -30,7 +32,7 @@ func construir_tablero() -> Array[CasillaData]:
 		casilla_vis.name = "Casilla_%d" % i
 		casilla_vis.setup(datos, es_esquina)
 
-		var pos = _calcular_posicion(i, paso, mitad)
+		var pos = _calcular_posicion(i)
 		casilla_vis.position = pos.pos
 		casilla_vis.rotation.y = pos.rot_y
 		contenedor_visual.add_child(casilla_vis)
@@ -41,34 +43,44 @@ func construir_tablero() -> Array[CasillaData]:
 
 	return casillas_data
 
-func _calcular_posicion(i: int, paso: float, mitad: float) -> Dictionary:
+func _calcular_posicion(i: int) -> Dictionary:
+	var lado = i / 10 # 0: inferior, 1: izquierdo, 2: superior, 3: derecho
+	var idx_en_lado = i % 10
+
+	var offset_coord := 0.0
+	if idx_en_lado == 0:
+		offset_coord = MITAD_TABLERO
+	else:
+		offset_coord = (MITAD_TABLERO - ESQUINA_SIZE * 0.5 - CASILLA_W * 0.5) - (idx_en_lado - 1) * CASILLA_W
+
 	var pos_x := 0.0
 	var pos_z := 0.0
 	var rot_y := 0.0
 
-	if i >= 0 and i <= 10:
-		pos_x = mitad - (i * paso)
-		pos_z = mitad
-		rot_y = 0
-	elif i > 10 and i <= 20:
-		pos_x = -mitad
-		pos_z = mitad - ((i - 10) * paso)
-		rot_y = PI / 2
-	elif i > 20 and i <= 30:
-		pos_x = -mitad + ((i - 20) * paso)
-		pos_z = -mitad
-		rot_y = PI
-	else:
-		pos_x = mitad
-		pos_z = -mitad + ((i - 30) * paso)
-		rot_y = -PI / 2.0
+	match lado:
+		0: # Lado inferior (Salida a Cárcel)
+			pos_x = offset_coord
+			pos_z = MITAD_TABLERO
+			rot_y = 0.0
+		1: # Lado izquierdo (Cárcel a Parking)
+			pos_x = -MITAD_TABLERO
+			pos_z = offset_coord
+			rot_y = PI / 2.0
+		2: # Lado superior (Parking a Ir a la Cárcel)
+			pos_x = -offset_coord
+			pos_z = -MITAD_TABLERO
+			rot_y = PI
+		3: # Lado derecho (Ir a la Cárcel a Salida)
+			pos_x = MITAD_TABLERO
+			pos_z = -offset_coord
+			rot_y = -PI / 2.0
 
 	return {"pos": Vector3(pos_x, 0, pos_z), "rot_y": rot_y}
 
 func obtener_posicion_casilla_con_offset(index: int, id_jugador: int, total_jugadores: int = 2) -> Vector3:
 	var base_pos = casillas_data[index].posicion_3d
 	var d = 0.26
-	var h = 0.36
+	var h = 0.385 # Elevación justa para asentar la ficha sobre las letras sin flotar
 	var offsets = [
 		Vector3(-d, h, -d), Vector3(d, h, d),
 		Vector3(d, h, -d), Vector3(-d, h, d)
@@ -81,12 +93,12 @@ func obtener_posicion_casilla_con_offset(index: int, id_jugador: int, total_juga
 # ═══════════════════════════════════════════════════════════════════
 
 func _crear_entorno() -> void:
-	# Luz solar cálida principal
+	# Luz solar cálida principal tipo estudio/atardecer elegante
 	var sun = DirectionalLight3D.new()
 	sun.shadow_enabled = true
-	sun.light_color = Color(1.0, 0.95, 0.88)
-	sun.light_energy = 1.5
-	sun.shadow_blur = 2.5
+	sun.light_color = Color(1.0, 0.94, 0.85)
+	sun.light_energy = 1.6
+	sun.shadow_blur = 2.0
 	sun.rotation = Vector3(-deg_to_rad(60), deg_to_rad(28), 0)
 	add_child(sun)
 
@@ -98,17 +110,24 @@ func _crear_entorno() -> void:
 	fill.rotation = Vector3(-deg_to_rad(38), -deg_to_rad(135), 0)
 	add_child(fill)
 
-	# Entorno con fondo oscuro elegante
+	# Entorno con SSAO (Oclusión Ambiental) y Tonemap Filmic/ACES
 	var env_node = WorldEnvironment.new()
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.03, 0.04, 0.06)
 	env.ambient_light_color = Color(0.85, 0.87, 0.93)
 	env.ambient_light_energy = 1.0
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.05
+
+	# SSAO para sombras de contacto reales entre fichas, casillas y cartas
+	env.ssao_enabled = true
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 2.5
+	env.ssao_detail = 0.5
+
 	env_node.environment = env
 	add_child(env_node)
 
@@ -144,23 +163,46 @@ func _crear_superficie_mesa() -> void:
 	contenedor_visual.add_child(mesa)
 
 func _crear_base_tablero() -> void:
-	# Marco exterior dorado grueso
+	# Marco exterior de madera oscura pulida
+	var marco_madera = MeshInstance3D.new()
+	var box_m = BoxMesh.new()
+	box_m.size = Vector3(16.5, 0.35, 16.5)
+	marco_madera.mesh = box_m
+	var mat_m = StandardMaterial3D.new()
+	mat_m.albedo_color = Color(0.12, 0.06, 0.03) # Caoba oscura pulida
+	var wood_tex = _cargar_textura([
+		"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/textures/wood_texture.png",
+		"C:/Users/usuario/.gemini/antigravity-ide/brain/d6fad507-c1cf-49bb-b6eb-1631344b7bf7/wood_texture_1790054206611.png"
+	])
+	if wood_tex:
+		mat_m.albedo_texture = wood_tex
+		mat_m.uv1_scale = Vector3(4, 4, 1)
+	mat_m.roughness = 0.22
+	mat_m.metallic = 0.1
+	marco_madera.material_override = mat_m
+	marco_madera.position = Vector3(0, -0.18, 0)
+	contenedor_visual.add_child(marco_madera)
+
+	# Esquineros de bronce/oro tallado en las 4 esquinas del marco exterior
+	_crear_esquineros_oro(16.5, 0.36)
+
+	# Filete dorado interior
 	var filete = MeshInstance3D.new()
 	var box_f = BoxMesh.new()
-	box_f.size = Vector3(TABLERO_ANCHO + 2.2, 0.28, TABLERO_ANCHO + 2.2)
+	box_f.size = Vector3(15.2, 0.28, 15.2)
 	filete.mesh = box_f
 	var mat_f = StandardMaterial3D.new()
-	mat_f.albedo_color = Color(0.82, 0.65, 0.18)
+	mat_f.albedo_color = Color(0.88, 0.72, 0.22)
 	mat_f.metallic = 0.88
 	mat_f.roughness = 0.12
 	filete.material_override = mat_f
-	filete.position = Vector3(0, -0.14, 0)
+	filete.position = Vector3(0, -0.13, 0)
 	contenedor_visual.add_child(filete)
 
 	# Tablero verde oscuro base sólido
 	var base = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(TABLERO_ANCHO + 1.8, 0.22, TABLERO_ANCHO + 1.8)
+	box.size = Vector3(14.88, 0.22, 14.88)
 	base.mesh = box
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color(0.05, 0.22, 0.12)
@@ -169,95 +211,71 @@ func _crear_base_tablero() -> void:
 	base.position = Vector3(0, -0.11, 0)
 	contenedor_visual.add_child(base)
 
+func _crear_esquineros_oro(tam_marco: float, alto_m: float) -> void:
+	var offset_c = tam_marco * 0.5 - 0.4
+	var mat_oro = StandardMaterial3D.new()
+	mat_oro.albedo_color = Color(0.9, 0.75, 0.25)
+	mat_oro.metallic = 0.9
+	mat_oro.roughness = 0.15
+
+	var esquinas = [
+		Vector3(-offset_c, -0.16, -offset_c),
+		Vector3(offset_c, -0.16, -offset_c),
+		Vector3(-offset_c, -0.16, offset_c),
+		Vector3(offset_c, -0.16, offset_c)
+	]
+	for p in esquinas:
+		var corner_mesh = MeshInstance3D.new()
+		var box = BoxMesh.new()
+		box.size = Vector3(0.8, 0.37, 0.8)
+		corner_mesh.mesh = box
+		corner_mesh.material_override = mat_oro
+		corner_mesh.position = p
+		contenedor_visual.add_child(corner_mesh)
+
+func _cargar_modelo_ciudad() -> Node3D:
+	var rutas = [
+		"res://city.glb",
+		"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/city.glb"
+	]
+	for r in rutas:
+		if ResourceLoader.exists(r):
+			var res = load(r)
+			if res is PackedScene:
+				return res.instantiate()
+	return null
+
 func _crear_centro() -> void:
-	# Tapete central verde clásico Monopoly elevado
+	# Tapete central de paño de casino verde clásico
 	var tapete = MeshInstance3D.new()
 	var plano = BoxMesh.new()
-	plano.size = Vector3(TABLERO_ANCHO - 1.5, 0.08, TABLERO_ANCHO - 1.5)
+	plano.size = Vector3(11.52, 0.08, 11.52)
 	tapete.mesh = plano
 	var mat_t = StandardMaterial3D.new()
-	mat_t.albedo_color = Color(0.14, 0.46, 0.24) # Verde clásico vibrante Monopoly
-	mat_t.roughness = 0.65
+	mat_t.albedo_color = Color(0.08, 0.28, 0.16) # Paño de casino verde profundo
+	mat_t.roughness = 0.75
 	tapete.material_override = mat_t
 	tapete.position = Vector3(0, 0.04, 0)
 	contenedor_visual.add_child(tapete)
 
-	# ── Líneas decorativas doradas en el centro ──
+	# ══ CIUDAD 3D CENTRAL REALISTA (city.glb) ══
+	var ciudad_node = _cargar_modelo_ciudad()
+	if ciudad_node:
+		ciudad_node.name = "Ciudad3DCentro"
+		ciudad_node.position = Vector3(0, 0.08, 0.4) # Centrada en el centro exacto del tablero
+		ciudad_node.scale = Vector3(0.00048, 0.00048, 0.00048) # Escala ajustada con margen de padding para casas y hoteles
+		contenedor_visual.add_child(ciudad_node)
+
+	# ── Filetes de riel dorado alrededor del tapete interno ──
+	var tam_i = TABLERO_ANCHO - 1.5
+	_crear_linea_decorativa(Vector3(0, 0.082, -tam_i * 0.5 + 0.04), Vector3(tam_i, 0.015, 0.08), Color(0.85, 0.7, 0.22))
+	_crear_linea_decorativa(Vector3(0, 0.082, tam_i * 0.5 - 0.04), Vector3(tam_i, 0.015, 0.08), Color(0.85, 0.7, 0.22))
+	_crear_linea_decorativa(Vector3(-tam_i * 0.5 + 0.04, 0.082, 0), Vector3(0.08, 0.015, tam_i), Color(0.85, 0.7, 0.22))
+	_crear_linea_decorativa(Vector3(tam_i * 0.5 - 0.04, 0.082, 0), Vector3(0.08, 0.015, tam_i), Color(0.85, 0.7, 0.22))
+
+	# ── Líneas decorativas doradas en cruz en el centro ──
 	_crear_linea_decorativa(Vector3(0, 0.085, 0), Vector3(8.0, 0.02, 0.06), Color(0.85, 0.7, 0.25, 0.4))
 	_crear_linea_decorativa(Vector3(0, 0.085, 0), Vector3(0.06, 0.02, 8.0), Color(0.85, 0.7, 0.25, 0.4))
-
-	# ══ PLACA MONOPOLY GRANDE ELEVADA ══
-	var placa = MeshInstance3D.new()
-	var box_p = BoxMesh.new()
-	box_p.size = Vector3(6.5, 0.16, 1.8)
-	placa.mesh = box_p
-	var mat_p = StandardMaterial3D.new()
-	mat_p.albedo_color = Color(0.85, 0.1, 0.1)
-	var logo_tex = _cargar_textura([
-		"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/textures/monopoly_logo.png",
-		"C:/Users/usuario/.gemini/antigravity-ide/brain/d6fad507-c1cf-49bb-b6eb-1631344b7bf7/monopoly_logo_1790054123543.png"
-	])
-	if logo_tex:
-		mat_p.albedo_texture = logo_tex
-	mat_p.roughness = 0.15
-	mat_p.emission_enabled = true
-	mat_p.emission = Color(0.2, 0.02, 0.02)
-	mat_p.emission_energy_multiplier = 0.2
-	placa.material_override = mat_p
-	placa.position = Vector3(0, 0.14, 0.3)
-	placa.rotation.y = -deg_to_rad(20)
-	contenedor_visual.add_child(placa)
-
-	# Borde dorado de la placa
-	var borde_placa = MeshInstance3D.new()
-	var box_bp = BoxMesh.new()
-	box_bp.size = Vector3(6.75, 0.14, 2.05)
-	borde_placa.mesh = box_bp
-	var mat_bp = StandardMaterial3D.new()
-	mat_bp.albedo_color = Color(0.85, 0.68, 0.2)
-	mat_bp.metallic = 0.85
-	mat_bp.roughness = 0.15
-	borde_placa.material_override = mat_bp
-	borde_placa.position = Vector3(0, 0.13, 0.3)
-	borde_placa.rotation.y = -deg_to_rad(20)
-	contenedor_visual.add_child(borde_placa)
-
-	# Texto MONOPOLY enorme elevado
-	var titulo = Label3D.new()
-	titulo.text = "MONOPOLY"
-	titulo.font_size = 72
-	titulo.pixel_size = 0.009
-	titulo.no_depth_test = true
-	titulo.render_priority = 12
-	titulo.shaded = false
-	titulo.double_sided = true
-	titulo.modulate = Color(1.0, 1.0, 1.0)
-	titulo.outline_modulate = Color(0.4, 0.02, 0.02)
-	titulo.outline_size = 10
-	titulo.rotation = Vector3(-PI / 2, 0, 0)
-	titulo.position = Vector3(0, 0.18, 0)
-	placa.add_child(titulo)
-
-	# Subtítulo
-	var sub = Label3D.new()
-	sub.text = "EDICIÓN CLÁSICA"
-	sub.font_size = 28
-	sub.pixel_size = 0.005
-	sub.no_depth_test = true
-	sub.render_priority = 12
-	sub.shaded = false
-	sub.double_sided = true
-	sub.modulate = Color(0.95, 0.85, 0.5)
-	sub.outline_modulate = Color(0.3, 0.02, 0.02)
-	sub.outline_size = 6
-	sub.rotation = Vector3(-PI / 2, 0, 0)
-	sub.position = Vector3(0, 0.18, 0.55)
-	placa.add_child(sub)
-
-	# ── Mazo Arca Comunal (esquina sup-izq) ──
-	_crear_mazo(Vector3(-4.0, 0.06, -3.0), Color(0.12, 0.38, 0.72), "ARCA\nCOMUNAL", -deg_to_rad(40), "arca")
-	# ── Mazo Casualidad (esquina inf-der) ──
-	_crear_mazo(Vector3(4.0, 0.06, 3.0), Color(0.88, 0.5, 0.08), "CASUALIDAD", deg_to_rad(40), "suerte")
 
 func _crear_linea_decorativa(pos: Vector3, size: Vector3, color: Color) -> void:
 	var linea = MeshInstance3D.new()
@@ -273,34 +291,36 @@ func _crear_linea_decorativa(pos: Vector3, size: Vector3, color: Color) -> void:
 	contenedor_visual.add_child(linea)
 
 func _crear_mazo(pos: Vector3, color: Color, texto: String, rot: float, clave_tex: String = "") -> void:
-	# Base del mazo
-	var base_m = MeshInstance3D.new()
-	var box_b = BoxMesh.new()
-	box_b.size = Vector3(2.3, 0.06, 1.5)
-	base_m.mesh = box_b
-	var mat_b = StandardMaterial3D.new()
-	mat_b.albedo_color = color.darkened(0.25)
-	mat_b.roughness = 0.5
-	base_m.material_override = mat_b
-	base_m.position = pos
-	base_m.rotation.y = rot
-	contenedor_visual.add_child(base_m)
+	# Marco/Bandeja 3D del mazo con filete dorado
+	var caja = MeshInstance3D.new()
+	var box_c = BoxMesh.new()
+	box_c.size = Vector3(2.5, 0.1, 1.7)
+	caja.mesh = box_c
+	var mat_c = StandardMaterial3D.new()
+	mat_c.albedo_color = Color(0.85, 0.7, 0.2) # Marco dorado de la caja
+	mat_c.metallic = 0.85
+	mat_c.roughness = 0.18
+	caja.material_override = mat_c
+	caja.position = pos
+	caja.rotation.y = rot
+	contenedor_visual.add_child(caja)
 
-	# Pila de cartas
+	# Montón de cartas 3D con grosor de papel real
 	var pila = MeshInstance3D.new()
 	var box_p = BoxMesh.new()
-	box_p.size = Vector3(1.85, 0.22, 1.15)
+	box_p.size = Vector3(2.35, 0.32, 1.55)
 	pila.mesh = box_p
 	var mat_p = StandardMaterial3D.new()
-	mat_p.albedo_color = Color(0.97, 0.97, 0.94)
+	mat_p.albedo_color = Color(0.96, 0.95, 0.92) # Papel marfil de las cartas apiladas
+	mat_p.roughness = 0.6
 	pila.material_override = mat_p
-	pila.position = Vector3(0, 0.14, 0)
-	base_m.add_child(pila)
+	pila.position = Vector3(0, 0.16, 0)
+	caja.add_child(pila)
 
-	# Carta superior con color o textura
+	# Carta superior 3D con borde dorado
 	var top = MeshInstance3D.new()
 	var box_t = BoxMesh.new()
-	box_t.size = Vector3(1.82, 0.03, 1.12)
+	box_t.size = Vector3(2.30, 0.03, 1.50)
 	top.mesh = box_t
 	var mat_t = StandardMaterial3D.new()
 	mat_t.albedo_color = color
@@ -310,11 +330,13 @@ func _crear_mazo(pos: Vector3, color: Color, texto: String, rot: float, clave_te
 			"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/textures/chest_card.png",
 			"C:/Users/usuario/.gemini/antigravity-ide/brain/d6fad507-c1cf-49bb-b6eb-1631344b7bf7/chest_card_1790054172237.png"
 		])
+		mazo_arca_top = top
 	elif clave_tex == "suerte":
 		card_tex = _cargar_textura([
 			"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/textures/chance_card.png",
 			"C:/Users/usuario/.gemini/antigravity-ide/brain/d6fad507-c1cf-49bb-b6eb-1631344b7bf7/chance_card_1790054160909.png"
 		])
+		mazo_suerte_top = top
 	if card_tex:
 		mat_t.albedo_texture = card_tex
 	mat_t.roughness = 0.25
@@ -322,13 +344,14 @@ func _crear_mazo(pos: Vector3, color: Color, texto: String, rot: float, clave_te
 	mat_t.emission = color.darkened(0.2)
 	mat_t.emission_energy_multiplier = 0.15
 	top.material_override = mat_t
-	top.position = Vector3(0, 0.125, 0)
+	top.position = Vector3(0, 0.175, 0)
 	pila.add_child(top)
 
 	# Texto del mazo
 	var lbl = Label3D.new()
+	lbl.name = "LabelTituloMazo"
 	lbl.text = texto
-	lbl.font_size = 28
+	lbl.font_size = 32
 	lbl.pixel_size = 0.005
 	lbl.no_depth_test = true
 	lbl.render_priority = 10
@@ -338,8 +361,8 @@ func _crear_mazo(pos: Vector3, color: Color, texto: String, rot: float, clave_te
 	lbl.outline_modulate = Color.BLACK
 	lbl.outline_size = 6
 	lbl.rotation = Vector3(-PI / 2, 0, 0)
-	lbl.position = Vector3(0, 0.15, 0)
-	pila.add_child(lbl)
+	lbl.position = Vector3(0, 0.02, 0)
+	top.add_child(lbl)
 
 # ═══════════════════════════════════════════════════════════════════
 #   DATOS DE CASILLAS

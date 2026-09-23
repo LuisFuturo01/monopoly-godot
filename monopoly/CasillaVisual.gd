@@ -51,7 +51,7 @@ func setup(p_data: CasillaData, es_esquina: bool = false) -> void:
 	mesh_base.position = Vector3(0, CASILLA_H * 0.5 + 0.01, 0)
 	add_child(mesh_base)
 
-	# ── Banda de color del grupo (calles) ──
+	# ── Banda de color del grupo (calles) con acabado satinado PBR ──
 	if data.tipo == "calle":
 		mesh_banda = MeshInstance3D.new()
 		var box_banda = BoxMesh.new()
@@ -59,10 +59,14 @@ func setup(p_data: CasillaData, es_esquina: bool = false) -> void:
 		mesh_banda.mesh = box_banda
 		var mat_banda = StandardMaterial3D.new()
 		mat_banda.albedo_color = data.color_grupo
-		mat_banda.roughness = 0.15
+		mat_banda.roughness = 0.22
+		mat_banda.metallic = 0.08
+		mat_banda.clearcoat_enabled = true
+		mat_banda.clearcoat = 0.4
+		mat_banda.clearcoat_roughness = 0.12
 		mat_banda.emission_enabled = true
-		mat_banda.emission = data.color_grupo.lightened(0.15)
-		mat_banda.emission_energy_multiplier = 0.35
+		mat_banda.emission = data.color_grupo.lightened(0.1)
+		mat_banda.emission_energy_multiplier = 0.25
 		mesh_banda.material_override = mat_banda
 		mesh_banda.position = Vector3(0, CASILLA_H + 0.03, d * 0.5 - BANDA_H * 0.5)
 		add_child(mesh_banda)
@@ -82,16 +86,16 @@ func setup(p_data: CasillaData, es_esquina: bool = false) -> void:
 
 func _color_base(es_esquina: bool) -> Color:
 	match data.tipo:
-		"salida":    return Color(0.82, 0.96, 0.84)
-		"carcel":    return Color(0.96, 0.85, 0.65)
-		"parking":   return Color(0.78, 0.9, 0.98)
-		"ir_carcel": return Color(0.98, 0.76, 0.76)
-		"suerte":    return Color(0.98, 0.93, 0.8)
-		"arca":      return Color(0.82, 0.9, 0.98)
-		"impuesto":  return Color(0.93, 0.93, 0.9)
-		"estacion":  return Color(0.92, 0.92, 0.9)
-		"servicio":  return Color(0.92, 0.92, 0.9)
-		_:           return Color(0.95, 0.96, 0.92)
+		"salida":    return Color(0.85, 0.96, 0.86)
+		"carcel":    return Color(0.96, 0.88, 0.72)
+		"parking":   return Color(0.82, 0.92, 0.98)
+		"ir_carcel": return Color(0.98, 0.82, 0.82)
+		"suerte":    return Color(0.98, 0.94, 0.85)
+		"arca":      return Color(0.85, 0.92, 0.98)
+		"impuesto":  return Color(0.94, 0.93, 0.90)
+		"estacion":  return Color(0.93, 0.93, 0.91)
+		"servicio":  return Color(0.93, 0.93, 0.91)
+		_:           return Color(0.96, 0.96, 0.93) # Papel marfil clásico de Monopoly
 
 func _crear_nombre(w: float, d: float, es_esquina: bool) -> void:
 	label_nombre = Label3D.new()
@@ -102,8 +106,8 @@ func _crear_nombre(w: float, d: float, es_esquina: bool) -> void:
 	label_nombre.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label_nombre.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label_nombre.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label_nombre.no_depth_test = true
-	label_nombre.render_priority = 10
+	label_nombre.no_depth_test = false # Permite que las fichas 3D pisen y tapen las letras
+	label_nombre.render_priority = 2
 	label_nombre.shaded = false
 	label_nombre.double_sided = true
 	label_nombre.modulate = Color(0.05, 0.05, 0.05)
@@ -111,31 +115,33 @@ func _crear_nombre(w: float, d: float, es_esquina: bool) -> void:
 	label_nombre.outline_size = 8
 	label_nombre.rotation = Vector3(-PI / 2, 0, 0)
 
+	var y_surface = CASILLA_H + 0.025
 	match data.tipo:
 		"calle":
-			label_nombre.position = Vector3(0, CASILLA_H + 0.045, -0.1)
+			label_nombre.position = Vector3(0, y_surface, -0.1)
 		"salida", "carcel", "parking", "ir_carcel":
-			label_nombre.position = Vector3(0, CASILLA_H + 0.045, 0.15)
+			label_nombre.position = Vector3(0, y_surface, 0.15)
 		_:
-			label_nombre.position = Vector3(0, CASILLA_H + 0.045, -0.1)
+			label_nombre.position = Vector3(0, y_surface, -0.1)
 	add_child(label_nombre)
 
 func _crear_precio(w: float, d: float, es_esquina: bool) -> void:
+	var y_surface = CASILLA_H + 0.025
 	if data is PropiedadCasillaData:
 		var prop = data as PropiedadCasillaData
 		label_precio = Label3D.new()
 		label_precio.text = "$" + str(prop.precio)
 		label_precio.font_size = 24
 		label_precio.pixel_size = 0.006
-		label_precio.no_depth_test = true
-		label_precio.render_priority = 10
+		label_precio.no_depth_test = false # La pieza cubre la letra
+		label_precio.render_priority = 2
 		label_precio.shaded = false
 		label_precio.double_sided = true
-		label_precio.modulate = Color(0.0, 0.35, 0.0)
+		label_precio.modulate = Color(0.0, 0.38, 0.05)
 		label_precio.outline_modulate = Color(1.0, 1.0, 0.98)
 		label_precio.outline_size = 6
 		label_precio.rotation = Vector3(-PI / 2, 0, 0)
-		label_precio.position = Vector3(0, CASILLA_H + 0.045, -d * 0.5 + 0.32)
+		label_precio.position = Vector3(0, y_surface, -d * 0.5 + 0.32)
 		add_child(label_precio)
 
 	# Texto especial para esquinas y tipos sin precio
@@ -143,8 +149,8 @@ func _crear_precio(w: float, d: float, es_esquina: bool) -> void:
 		var lbl_extra = Label3D.new()
 		lbl_extra.font_size = 24 if not es_esquina else 28
 		lbl_extra.pixel_size = 0.007 if es_esquina else 0.006
-		lbl_extra.no_depth_test = true
-		lbl_extra.render_priority = 10
+		lbl_extra.no_depth_test = false # La pieza cubre la letra
+		lbl_extra.render_priority = 2
 		lbl_extra.shaded = false
 		lbl_extra.double_sided = true
 		lbl_extra.outline_size = 6
@@ -155,22 +161,22 @@ func _crear_precio(w: float, d: float, es_esquina: bool) -> void:
 				lbl_extra.text = "Cobras $200"
 				lbl_extra.modulate = Color(0.0, 0.5, 0.15)
 				lbl_extra.outline_modulate = Color(1,1,1)
-				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+				lbl_extra.position = Vector3(0, y_surface, -0.35)
 			"parking":
 				lbl_extra.text = "Descanso"
 				lbl_extra.modulate = Color(0.1, 0.35, 0.7)
 				lbl_extra.outline_modulate = Color(1,1,1)
-				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+				lbl_extra.position = Vector3(0, y_surface, -0.35)
 			"carcel":
 				lbl_extra.text = "De visita"
 				lbl_extra.modulate = Color(0.5, 0.3, 0.1)
 				lbl_extra.outline_modulate = Color(1,1,1)
-				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+				lbl_extra.position = Vector3(0, y_surface, -0.35)
 			"ir_carcel":
 				lbl_extra.text = "Ve directo"
 				lbl_extra.modulate = Color(0.7, 0.1, 0.1)
 				lbl_extra.outline_modulate = Color(1,1,1)
-				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, -0.35)
+				lbl_extra.position = Vector3(0, y_surface, -0.35)
 			"suerte":
 				lbl_extra.text = "?"
 				lbl_extra.font_size = 42
@@ -178,7 +184,7 @@ func _crear_precio(w: float, d: float, es_esquina: bool) -> void:
 				lbl_extra.modulate = Color(0.85, 0.45, 0.05)
 				lbl_extra.outline_modulate = Color(1,0.95,0.85)
 				lbl_extra.outline_size = 8
-				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, 0.28)
+				lbl_extra.position = Vector3(0, y_surface, 0.28)
 			"arca":
 				lbl_extra.text = "?"
 				lbl_extra.font_size = 42
@@ -186,13 +192,13 @@ func _crear_precio(w: float, d: float, es_esquina: bool) -> void:
 				lbl_extra.modulate = Color(0.1, 0.35, 0.7)
 				lbl_extra.outline_modulate = Color(0.85,0.92,1)
 				lbl_extra.outline_size = 8
-				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, 0.28)
+				lbl_extra.position = Vector3(0, y_surface, 0.28)
 			"impuesto":
 				var monto = 200 if data.id == 4 else 100
 				lbl_extra.text = "Paga $%d" % monto
 				lbl_extra.modulate = Color(0.7, 0.15, 0.15)
 				lbl_extra.outline_modulate = Color(1,1,1)
-				lbl_extra.position = Vector3(0, CASILLA_H + 0.045, 0.28)
+				lbl_extra.position = Vector3(0, y_surface, 0.28)
 		add_child(lbl_extra)
 
 func actualizar_propietario(color_propietario: Color) -> void:
