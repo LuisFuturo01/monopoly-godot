@@ -60,8 +60,14 @@ var _carta_orig_pos: Vector3
 var _carta_orig_rot: Vector3
 var _carta_orig_scale: Vector3
 
-# Botón principal
+# Botones principales
 var btn_tirar: Button
+var btn_construir: Button
+
+# Modal de construcción de casas/hoteles
+var construir_modal: PanelContainer
+var construir_vb_contenido: VBoxContainer
+
 
 # Player 3D tags en la mesa
 var player_tags3d: Array[Label3D] = []
@@ -861,14 +867,14 @@ func _construir_ui() -> void:
 	dados_msg.add_theme_constant_override("outline_size", 4)
 	vb_d.add_child(dados_msg)
 
-	# ── Botón Tirar Dados de Lujo con profundidad y brillo dorado ──
+	# ── Botón Tirar Dados ──
 	btn_tirar = Button.new()
 	btn_tirar.text = "🎲  TIRAR DADOS"
-	btn_tirar.anchor_left = 0.37
+	btn_tirar.anchor_left = 0.22
 	btn_tirar.anchor_top = 0.86
-	btn_tirar.anchor_right = 0.63
+	btn_tirar.anchor_right = 0.48
 	btn_tirar.anchor_bottom = 0.95
-	btn_tirar.add_theme_font_size_override("font_size", 19)
+	btn_tirar.add_theme_font_size_override("font_size", 18)
 
 	var style_btn = StyleBoxFlat.new()
 	style_btn.bg_color = Color(0.85, 0.15, 0.18)
@@ -913,6 +919,66 @@ func _construir_ui() -> void:
 	btn_tirar.add_theme_color_override("font_disabled_color", Color(0.5, 0.52, 0.58))
 	btn_tirar.pressed.connect(ejecutar_turno)
 	canvas.add_child(btn_tirar)
+
+	# ── Botón Construir Casas / Hoteles ──
+	btn_construir = Button.new()
+	btn_construir.text = "🏠  CONSTRUIR"
+	btn_construir.anchor_left = 0.52
+	btn_construir.anchor_top = 0.86
+	btn_construir.anchor_right = 0.78
+	btn_construir.anchor_bottom = 0.95
+	btn_construir.add_theme_font_size_override("font_size", 18)
+
+	var style_cbtn = StyleBoxFlat.new()
+	style_cbtn.bg_color = Color(0.15, 0.58, 0.28)
+	style_cbtn.border_color = Color(0.4, 0.9, 0.55)
+	style_cbtn.set_border_width_all(2)
+	style_cbtn.set_corner_radius_all(14)
+	style_cbtn.set_content_margin_all(8)
+	style_cbtn.shadow_color = Color(0.05, 0.3, 0.1, 0.6)
+	style_cbtn.shadow_size = 10
+	style_cbtn.shadow_offset = Vector2(0, 4)
+	btn_construir.add_theme_stylebox_override("normal", style_cbtn)
+
+	var style_cbtn_h = StyleBoxFlat.new()
+	style_cbtn_h.bg_color = Color(0.2, 0.72, 0.35)
+	style_cbtn_h.border_color = Color(0.6, 1.0, 0.7)
+	style_cbtn_h.set_border_width_all(2)
+	style_cbtn_h.set_corner_radius_all(14)
+	style_cbtn_h.set_content_margin_all(8)
+	btn_construir.add_theme_stylebox_override("hover", style_cbtn_h)
+
+	btn_construir.add_theme_color_override("font_color", Color.WHITE)
+	btn_construir.pressed.connect(_abrir_modal_construccion)
+	canvas.add_child(btn_construir)
+
+	# ── Modal de Construcción de Casas/Hoteles ──
+	construir_modal = PanelContainer.new()
+	construir_modal.anchor_left = 0.5
+	construir_modal.anchor_top = 0.5
+	construir_modal.anchor_right = 0.5
+	construir_modal.anchor_bottom = 0.5
+	construir_modal.offset_left = -230
+	construir_modal.offset_top = -220
+	construir_modal.offset_right = 230
+	construir_modal.offset_bottom = 220
+	construir_modal.visible = false
+
+	var style_cmod = StyleBoxFlat.new()
+	style_cmod.bg_color = Color(0.06, 0.09, 0.16, 0.96)
+	style_cmod.border_color = Color(0.25, 0.85, 0.45, 0.85)
+	style_cmod.set_border_width_all(2)
+	style_cmod.set_corner_radius_all(16)
+	style_cmod.set_content_margin_all(16)
+	style_cmod.shadow_color = Color(0, 0, 0, 0.6)
+	style_cmod.shadow_size = 18
+	construir_modal.add_theme_stylebox_override("panel", style_cmod)
+	canvas.add_child(construir_modal)
+
+	construir_vb_contenido = VBoxContainer.new()
+	construir_vb_contenido.add_theme_constant_override("separation", 10)
+	construir_modal.add_child(construir_vb_contenido)
+
 
 	# ── Panel compra (Glassmorphism) ──
 	compra_panel = PanelContainer.new()
@@ -1233,3 +1299,162 @@ func _actualizar_hud() -> void:
 func _notificar(msg: String) -> void:
 	if notif_label:
 		notif_label.text = msg
+
+# ─────────────────────────────────────────────────────────────────────
+#   MODAL DE CONSTRUCCIÓN DE CASAS / HOTELES
+# ─────────────────────────────────────────────────────────────────────
+
+func _abrir_modal_construccion() -> void:
+	if not construir_modal:
+		return
+
+	# Limpiar elementos anteriores
+	for child in construir_vb_contenido.get_children():
+		child.queue_free()
+
+	var jug = jugadores[turno_actual]
+
+	# Cabecera del modal
+	var header = VBoxContainer.new()
+	header.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	var title = Label.new()
+	title.text = "🏠 CONSTRUIR EN PROPIEDADES"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(0.25, 0.85, 0.45))
+	header.add_child(title)
+
+	var sub = Label.new()
+	sub.text = "%s — Saldo disponible: $%d" % [jug.nombre, jug.dinero]
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_font_size_override("font_size", 14)
+	sub.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
+	header.add_child(sub)
+
+	construir_vb_contenido.add_child(header)
+
+	# Scroll Container para la lista de propiedades
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(420, 260)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	construir_vb_contenido.add_child(scroll)
+
+	var list_container = VBoxContainer.new()
+	list_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list_container.add_theme_constant_override("separation", 8)
+	scroll.add_child(list_container)
+
+	# Obtener propiedades tipo "calle" del jugador actual (regla temporal: cualquier propiedad propia)
+	var props_construibles: Array = []
+	for prop in jug.propiedades:
+		if prop is PropiedadCasillaData and prop.tipo == "calle":
+			props_construibles.append(prop)
+
+	if props_construibles.is_empty():
+		var empty_lbl = Label.new()
+		empty_lbl.text = "No tienes calles compradas aún.\n¡Compra propiedades de calle para poder construir!"
+		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_lbl.add_theme_font_size_override("font_size", 14)
+		empty_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		list_container.add_child(empty_lbl)
+	else:
+		for prop in props_construibles:
+			var prop_item = PanelContainer.new()
+			var st_item = StyleBoxFlat.new()
+			st_item.bg_color = Color(0.12, 0.16, 0.24, 0.9)
+			st_item.border_color = prop.color_grupo
+			st_item.set_border_width_all(2)
+			st_item.set_corner_radius_all(8)
+			st_item.set_content_margin_all(8)
+			prop_item.add_theme_stylebox_override("panel", st_item)
+
+			var hb_row = HBoxContainer.new()
+			hb_row.alignment = BoxContainer.ALIGNMENT_CENTER
+			hb_row.add_theme_constant_override("separation", 10)
+			prop_item.add_child(hb_row)
+
+			var info_vb = VBoxContainer.new()
+			info_vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+			var lbl_name = Label.new()
+			lbl_name.text = prop.nombre.replace("\n", " ")
+			lbl_name.add_theme_font_size_override("font_size", 14)
+			lbl_name.add_theme_color_override("font_color", Color.WHITE)
+			info_vb.add_child(lbl_name)
+
+			var nivel_str = ""
+			if prop.casas == 0:
+				nivel_str = "Sin edificaciones"
+			elif prop.casas < 5:
+				nivel_str = "%d casa(s)" % prop.casas
+			else:
+				nivel_str = "🏨 1 Hotel (Máximo)"
+
+			var lbl_nivel = Label.new()
+			lbl_nivel.text = "Estado: " + nivel_str + " | Costo: $" + str(prop.costo_casa)
+			lbl_nivel.add_theme_font_size_override("font_size", 12)
+			lbl_nivel.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9))
+			info_vb.add_child(lbl_nivel)
+
+			hb_row.add_child(info_vb)
+
+			# Botón Construir
+			var btn_add = Button.new()
+			if prop.casas < 4:
+				btn_add.text = "+ Casa ($%d)" % prop.costo_casa
+			elif prop.casas == 4:
+				btn_add.text = "+ Hotel ($%d)" % prop.costo_casa
+			else:
+				btn_add.text = "Máximo"
+
+			btn_add.add_theme_font_size_override("font_size", 13)
+			btn_add.disabled = (prop.casas >= 5) or (not jug.puede_pagar(prop.costo_casa))
+
+			var st_badd = StyleBoxFlat.new()
+			st_badd.bg_color = Color(0.18, 0.65, 0.3)
+			st_badd.set_corner_radius_all(6)
+			st_badd.set_content_margin_all(6)
+			btn_add.add_theme_stylebox_override("normal", st_badd)
+			btn_add.add_theme_color_override("font_color", Color.WHITE)
+
+			var p_ref = prop
+			btn_add.pressed.connect(func():
+				_construir_en_propiedad(jug, p_ref)
+			)
+			hb_row.add_child(btn_add)
+
+			list_container.add_child(prop_item)
+
+	# Botón de Cerrar Modal
+	var btn_cerrar_mod = Button.new()
+	btn_cerrar_mod.text = "CERRAR"
+	btn_cerrar_mod.add_theme_font_size_override("font_size", 14)
+	var st_cls = StyleBoxFlat.new()
+	st_cls.bg_color = Color(0.45, 0.15, 0.15)
+	st_cls.set_corner_radius_all(8)
+	st_cls.set_content_margin_all(6)
+	btn_cerrar_mod.add_theme_stylebox_override("normal", st_cls)
+	btn_cerrar_mod.add_theme_color_override("font_color", Color.WHITE)
+	btn_cerrar_mod.pressed.connect(_cerrar_modal_construccion)
+	construir_vb_contenido.add_child(btn_cerrar_mod)
+
+	construir_modal.visible = true
+
+func _cerrar_modal_construccion() -> void:
+	if construir_modal:
+		construir_modal.visible = false
+
+func _construir_en_propiedad(jug: JugadorData, prop: PropiedadCasillaData) -> void:
+	if jug.puede_pagar(prop.costo_casa) and prop.casas < 5:
+		jug.modificar_dinero(-prop.costo_casa)
+		prop.agregar_casa()
+		var cas = casillas_data[prop.id]
+		if cas and cas.nodo_visual:
+			cas.nodo_visual.actualizar_casas(prop.casas)
+			_crear_efecto_particulas_compra(cas.nodo_visual.global_position)
+
+		var tipo_txt = "hotel" if prop.casas == 5 else "casa"
+		_notificar("🏠 " + jug.nombre + " construyó un " + tipo_txt + " en " + prop.nombre.replace("\n", " "))
+		_actualizar_hud()
+		_abrir_modal_construccion()

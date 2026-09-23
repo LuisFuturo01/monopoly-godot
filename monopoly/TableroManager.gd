@@ -2,7 +2,7 @@ class_name TableroManager
 extends Node3D
 
 var casillas_data: Array[CasillaData] = []
-var casillas_visuales: Array[CasillaVisual] = []
+var casillas_visuales: Array = []
 var contenedor_visual: Node3D
 
 const ESQUINA_SIZE: float = 1.68
@@ -235,7 +235,9 @@ func _crear_esquineros_oro(tam_marco: float, alto_m: float) -> void:
 
 func _cargar_modelo_ciudad() -> Node3D:
 	var rutas = [
+		"res://ciudad/city.glb",
 		"res://city.glb",
+		"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/ciudad/city.glb",
 		"d:/xampp/htdocs/PersonalProjects/monopoly/monopoly/city.glb"
 	]
 	for r in rutas:
