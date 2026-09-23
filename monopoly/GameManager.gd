@@ -45,11 +45,15 @@ var compra_info: Label
 var btn_comprar: Button
 var btn_pasar: Button
 
+# Modal detalle casilla
+var detalle_modal: PanelContainer
+var detalle_vb_contenido: VBoxContainer
+
 # Botón principal
 var btn_tirar: Button
 
-# Player card labels
-var player_cards: Array = []
+# Player 3D tags en la mesa
+var player_tags3d: Array[Label3D] = []
 
 func _ready() -> void:
 	randomize()
@@ -61,9 +65,10 @@ func _ready() -> void:
 	casillas_data = tablero_manager.construir_tablero()
 
 	_inicializar_jugadores(2)
+	_crear_tags_3d_mesa()
 	_construir_ui()
 	_actualizar_hud()
-	_notificar("Bienvenido a Monopoly 3D — Rotar cámara: Clic derecho | Zoom: Rueda | Q/E: Girar")
+	_notificar("🎲 ¡Bienvenido a Monopoly 3D!")
 
 func _setup_camara() -> void:
 	camara = Camera3D.new()
@@ -112,11 +117,43 @@ func _unhandled_input(event: InputEvent) -> void:
 			cam_distance = clamp(cam_distance - 1.2, 5.5, 24.0)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			cam_distance = clamp(cam_distance + 1.2, 5.5, 24.0)
+		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			_intentar_seleccionar_casilla_3d(event.position)
 
 	elif event is InputEventMouseMotion and is_orbiting:
 		var sens = 0.005
 		cam_yaw -= event.relative.x * sens
 		cam_pitch = clamp(cam_pitch - event.relative.y * sens, -deg_to_rad(85.0), -deg_to_rad(12.0))
+
+func _intentar_seleccionar_casilla_3d(click_pos: Vector2) -> void:
+	if not camara or casillas_data.is_empty():
+		return
+
+	var from = camara.project_ray_origin(click_pos)
+	var dir = camara.project_ray_normal(click_pos)
+
+	if abs(dir.y) < 0.001:
+		return
+
+	var t = (0.2 - from.y) / dir.y
+	if t <= 0.0:
+		return
+
+	var hit_pos = from + dir * t
+
+	var mejor_cas: CasillaData = null
+	var min_dist: float = 1.6
+
+	for cas in casillas_data:
+		if cas.nodo_visual:
+			var pos = cas.nodo_visual.global_position
+			var d = Vector2(hit_pos.x - pos.x, hit_pos.z - pos.z).length()
+			if d < min_dist:
+				min_dist = d
+				mejor_cas = cas
+
+	if mejor_cas:
+		_mostrar_modal_detalle_casilla(mejor_cas)
 
 func _inicializar_jugadores(cantidad: int) -> void:
 	var colores = [Color(0.92, 0.22, 0.22), Color(0.22, 0.5, 0.92)]
@@ -415,28 +452,31 @@ func _evento_arca(jug: JugadorData) -> void:
 #   UI
 # ─────────────────────────────────────────────────────────────────────
 
+var pos_esquinas_mesa = [
+	Vector3(8.8, 0.4, 8.8),
+	Vector3(-8.8, 0.4, 8.8),
+	Vector3(-8.8, 0.4, -8.8),
+	Vector3(8.8, 0.4, -8.8)
+]
+
+func _crear_tags_3d_mesa() -> void:
+	for i in range(jugadores.size()):
+		var jug = jugadores[i]
+		var lbl = Label3D.new()
+		lbl.name = "TagMesa_%d" % i
+		lbl.position = pos_esquinas_mesa[i % pos_esquinas_mesa.size()]
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.pixel_size = 0.007
+		lbl.font_size = 32
+		lbl.outline_size = 10
+		lbl.outline_modulate = Color.BLACK
+		lbl.modulate = jug.color_ficha
+		add_child(lbl)
+		player_tags3d.append(lbl)
+
 func _construir_ui() -> void:
 	canvas = CanvasLayer.new()
 	add_child(canvas)
-
-	# ── Tarjetas de jugador (superior) ──
-	hud_top = HBoxContainer.new()
-	hud_top.anchor_left = 0.0
-	hud_top.anchor_top = 0.0
-	hud_top.anchor_right = 1.0
-	hud_top.anchor_bottom = 0.0
-	hud_top.offset_top = 12
-	hud_top.offset_bottom = 58
-	hud_top.offset_left = 12
-	hud_top.offset_right = -12
-	hud_top.alignment = BoxContainer.ALIGNMENT_CENTER
-	hud_top.add_theme_constant_override("separation", 20)
-	canvas.add_child(hud_top)
-
-	for jug in jugadores:
-		var card = _crear_tarjeta_jugador(jug)
-		hud_top.add_child(card)
-		player_cards.append(card)
 
 	# ── Notificación ──
 	notif_label = Label.new()
@@ -444,8 +484,8 @@ func _construir_ui() -> void:
 	notif_label.anchor_top = 0.0
 	notif_label.anchor_right = 0.85
 	notif_label.anchor_bottom = 0.0
-	notif_label.offset_top = 62
-	notif_label.offset_bottom = 88
+	notif_label.offset_top = 16
+	notif_label.offset_bottom = 44
 	notif_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	notif_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	notif_label.add_theme_font_size_override("font_size", 18)
@@ -504,65 +544,6 @@ func _construir_ui() -> void:
 	dados_msg.add_theme_font_size_override("font_size", 17)
 	dados_msg.add_theme_color_override("font_color", Color(0.9, 0.88, 0.75))
 	vb_d.add_child(dados_msg)
-
-	# ── Panel Controles de Cámara (inferior-izq) ──
-	var cam_panel = PanelContainer.new()
-	cam_panel.anchor_left = 0.02
-	cam_panel.anchor_top = 0.86
-	cam_panel.anchor_right = 0.24
-	cam_panel.anchor_bottom = 0.98
-	
-	var style_cam = StyleBoxFlat.new()
-	style_cam.bg_color = Color(0.04, 0.06, 0.1, 0.85)
-	style_cam.border_color = Color(0.3, 0.45, 0.65)
-	style_cam.set_border_width_all(2)
-	style_cam.set_corner_radius_all(10)
-	style_cam.set_content_margin_all(8)
-	cam_panel.add_theme_stylebox_override("panel", style_cam)
-	canvas.add_child(cam_panel)
-
-	var vb_cam = VBoxContainer.new()
-	vb_cam.add_theme_constant_override("separation", 4)
-	cam_panel.add_child(vb_cam)
-
-	var lbl_cam = Label.new()
-	lbl_cam.text = "🎥 CÁMARA 3D"
-	lbl_cam.add_theme_font_size_override("font_size", 13)
-	lbl_cam.add_theme_color_override("font_color", Color(0.8, 0.88, 1.0))
-	vb_cam.add_child(lbl_cam)
-
-	var hb_cam_btns = HBoxContainer.new()
-	hb_cam_btns.add_theme_constant_override("separation", 8)
-	vb_cam.add_child(hb_cam_btns)
-
-	btn_modo_cine = Button.new()
-	btn_modo_cine.text = "🎬 Órbita Cine"
-	btn_modo_cine.add_theme_font_size_override("font_size", 12)
-	btn_modo_cine.pressed.connect(func():
-		modo_cine = not modo_cine
-		btn_modo_cine.text = "🎬 Órbita: ON" if modo_cine else "🎬 Órbita Cine"
-	)
-	hb_cam_btns.add_child(btn_modo_cine)
-
-	btn_reset_cam = Button.new()
-	btn_reset_cam.text = "🏠 Vista Frontal"
-	btn_reset_cam.add_theme_font_size_override("font_size", 12)
-	btn_reset_cam.pressed.connect(func():
-		cam_yaw = 0.0
-		cam_pitch = -deg_to_rad(52.0)
-		cam_distance = 14.5
-		cam_target = Vector3.ZERO
-		modo_cine = false
-		if btn_modo_cine:
-			btn_modo_cine.text = "🎬 Órbita Cine"
-	)
-	hb_cam_btns.add_child(btn_reset_cam)
-
-	var hint_cam = Label.new()
-	hint_cam.text = "🖱 Clic Der · Q/E · Rueda: Zoom"
-	hint_cam.add_theme_font_size_override("font_size", 11)
-	hint_cam.add_theme_color_override("font_color", Color(0.7, 0.75, 0.82))
-	vb_cam.add_child(hint_cam)
 
 	# ── Botón tirar ──
 	btn_tirar = Button.new()
@@ -662,6 +643,218 @@ func _construir_ui() -> void:
 	btn_pasar.pressed.connect(_on_pasar)
 	hb_c.add_child(btn_pasar)
 
+	# ── Modal Detalle Casilla (Tarjeta de Propiedad Auténtica) ──
+	detalle_modal = PanelContainer.new()
+	detalle_modal.anchor_left = 0.5
+	detalle_modal.anchor_top = 0.5
+	detalle_modal.anchor_right = 0.5
+	detalle_modal.anchor_bottom = 0.5
+	detalle_modal.offset_left = -160
+	detalle_modal.offset_top = -230
+	detalle_modal.offset_right = 160
+	detalle_modal.offset_bottom = 230
+	detalle_modal.visible = false
+
+	# Fondo tipo papel/cartulina de Monopoly blanco cálido con borde negro exterior
+	var style_mod = StyleBoxFlat.new()
+	style_mod.bg_color = Color(0.97, 0.96, 0.93)
+	style_mod.border_color = Color(0.1, 0.1, 0.1)
+	style_mod.set_border_width_all(3)
+	style_mod.set_corner_radius_all(12)
+	style_mod.set_content_margin_all(10)
+	detalle_modal.add_theme_stylebox_override("panel", style_mod)
+	canvas.add_child(detalle_modal)
+
+	detalle_vb_contenido = VBoxContainer.new()
+	detalle_vb_contenido.add_theme_constant_override("separation", 6)
+	detalle_modal.add_child(detalle_vb_contenido)
+
+func _mostrar_modal_detalle_casilla(cas: CasillaData) -> void:
+	if not detalle_modal:
+		return
+
+	# Limpiar contenido anterior
+	for child in detalle_vb_contenido.get_children():
+		child.queue_free()
+
+	# ── Cabecera de Color del Grupo (Banda superior auténtica) ──
+	var header = PanelContainer.new()
+	var style_h = StyleBoxFlat.new()
+	var bg_col = cas.color_grupo if cas.color_grupo != Color.WHITE else Color(0.15, 0.2, 0.3)
+	style_h.bg_color = bg_col
+	style_h.border_color = Color(0.1, 0.1, 0.1)
+	style_h.set_border_width_all(2)
+	style_h.set_corner_radius_all(6)
+	style_h.set_content_margin_all(8)
+	header.add_theme_stylebox_override("panel", style_h)
+	detalle_vb_contenido.add_child(header)
+
+	var vb_h = VBoxContainer.new()
+	vb_h.alignment = BoxContainer.ALIGNMENT_CENTER
+	header.add_child(vb_h)
+
+	var is_dark_header = bg_col.get_luminance() < 0.55
+	var text_col_h = Color.WHITE if is_dark_header else Color(0.08, 0.08, 0.1)
+
+	var tag_title = Label.new()
+	tag_title.text = "TÍTULO DE PROPIEDAD" if cas.es_propiedad() else "TABLERO DE MONOPOLY"
+	tag_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag_title.add_theme_font_size_override("font_size", 10)
+	tag_title.add_theme_color_override("font_color", text_col_h)
+	vb_h.add_child(tag_title)
+
+	var title_lbl = Label.new()
+	title_lbl.text = cas.nombre.replace("\n", " ").to_upper()
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 15)
+	title_lbl.add_theme_color_override("font_color", text_col_h)
+	title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb_h.add_child(title_lbl)
+
+	# ── Cuerpo de la Tarjeta con diseño oficial ──
+	if cas is PropiedadCasillaData:
+		var prop = cas as PropiedadCasillaData
+
+		var lbl_alq = Label.new()
+		lbl_alq.text = "ALQUILER  $%d" % prop.alquiler_base
+		lbl_alq.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_alq.add_theme_font_size_override("font_size", 14)
+		lbl_alq.add_theme_color_override("font_color", Color(0.12, 0.12, 0.14))
+		detalle_vb_contenido.add_child(lbl_alq)
+
+		# Tabla de casas estilo clásico Monopoly
+		if prop.tipo == "calle" and prop.alquileres_casas.size() >= 5:
+			_agregar_fila_tarjeta("Con 1 Casa", "$ %d" % prop.alquileres_casas[0])
+			_agregar_fila_tarjeta("Con 2 Casas", "$ %d" % prop.alquileres_casas[1])
+			_agregar_fila_tarjeta("Con 3 Casas", "$ %d" % prop.alquileres_casas[2])
+			_agregar_fila_tarjeta("Con 4 Casas", "$ %d" % prop.alquileres_casas[3])
+			_agregar_fila_tarjeta("Con HOTEL", "$ %d" % prop.alquileres_casas[4])
+
+			var sep1 = HSeparator.new()
+			detalle_vb_contenido.add_child(sep1)
+
+			var lbl_costo_casa = Label.new()
+			lbl_costo_casa.text = "Casas cuestan $%d c/u" % prop.costo_casa
+			lbl_costo_casa.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl_costo_casa.add_theme_font_size_override("font_size", 11)
+			lbl_costo_casa.add_theme_color_override("font_color", Color(0.25, 0.25, 0.3))
+			detalle_vb_contenido.add_child(lbl_costo_casa)
+
+			var lbl_costo_hotel = Label.new()
+			lbl_costo_hotel.text = "Hoteles, $%d más 4 casas" % prop.costo_casa
+			lbl_costo_hotel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl_costo_hotel.add_theme_font_size_override("font_size", 11)
+			lbl_costo_hotel.add_theme_color_override("font_color", Color(0.25, 0.25, 0.3))
+			detalle_vb_contenido.add_child(lbl_costo_hotel)
+
+		var sep2 = HSeparator.new()
+		detalle_vb_contenido.add_child(sep2)
+
+		# Estado de propiedad y dueño
+		var estado_txt = "🟢 Disponible por $%d" % prop.precio
+		var col_estado = Color(0.1, 0.5, 0.2)
+
+		if prop.esta_comprada():
+			var owner = jugadores[prop.propietario_id]
+			estado_txt = "👤 Dueño: " + owner.nombre
+			col_estado = owner.color_ficha
+
+		var lbl_estado = Label.new()
+		lbl_estado.text = estado_txt
+		lbl_estado.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_estado.add_theme_font_size_override("font_size", 12)
+		lbl_estado.add_theme_color_override("font_color", col_estado)
+		detalle_vb_contenido.add_child(lbl_estado)
+
+	else:
+		# Casillas Especiales
+		var icons = {
+			"salida": "🏁", "suerte": "❓", "arca": "♦",
+			"impuesto": "🏛", "carcel": "🚨", "parking": "🚗", "ir_carcel": "🚔"
+		}
+		var icon_lbl = Label.new()
+		icon_lbl.text = icons.get(cas.tipo, "🎲")
+		icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_lbl.add_theme_font_size_override("font_size", 42)
+		detalle_vb_contenido.add_child(icon_lbl)
+
+		var desc_lbl = Label.new()
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc_lbl.add_theme_font_size_override("font_size", 12)
+		desc_lbl.add_theme_color_override("font_color", Color(0.18, 0.2, 0.25))
+
+		var descs = {
+			"salida": "🏁 ¡Punto de partida!\nRecibe $200 cada vez que pases o caigas en esta casilla.",
+			"suerte": "❓ Casilla de Suerte\nToma una tarjeta de la suerte con sorpresas, premios o multas.",
+			"arca": "♦ Arca Comunal\nToma una tarjeta del tesoro comunal.",
+			"impuesto": "🏛 Impuestos del Estado\nDebes pagar el monto correspondiente al Banco.",
+			"carcel": "🚨 Cárcel / De Visita\nSi estás de visita no hay penalización. Si caíste detenido deberás pagar para salir.",
+			"parking": "🚗 Parada Libre\nDescanso libre sin costos ni efectos.",
+			"ir_carcel": "🚔 ¡Ir a la Cárcel!\nTu ficha es enviada directamente a la Cárcel sin cobrar los $200 de Salida."
+		}
+		desc_lbl.text = descs.get(cas.tipo, "Casilla especial del tablero de Monopoly.")
+		detalle_vb_contenido.add_child(desc_lbl)
+
+	# ── Botón Cerrar Estilizado ──
+	var btn_cerrar = Button.new()
+	btn_cerrar.text = "✖  CERRAR"
+	btn_cerrar.add_theme_font_size_override("font_size", 13)
+	var st_c = StyleBoxFlat.new()
+	st_c.bg_color = Color(0.18, 0.2, 0.26)
+	st_c.set_corner_radius_all(8)
+	st_c.set_content_margin_all(8)
+	btn_cerrar.add_theme_stylebox_override("normal", st_c)
+	btn_cerrar.add_theme_color_override("font_color", Color.WHITE)
+	btn_cerrar.pressed.connect(func():
+		_ocultar_modal_detalle()
+	)
+	detalle_vb_contenido.add_child(btn_cerrar)
+
+	# ── Animación desplegable suave ──
+	detalle_modal.pivot_offset = Vector2(160, 230)
+	detalle_modal.scale = Vector2(0.6, 0.6)
+	detalle_modal.modulate.a = 0.0
+	detalle_modal.visible = true
+
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(detalle_modal, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(detalle_modal, "modulate:a", 1.0, 0.18)
+
+	# Mover cámara suavemente hacia la casilla seleccionada
+	if cas.nodo_visual:
+		var target_pos = cas.nodo_visual.global_position
+		cam_target = Vector3(target_pos.x * 0.35, 0.0, target_pos.z * 0.35)
+
+func _agregar_fila_tarjeta(concepto: String, valor: String) -> void:
+	var hb = HBoxContainer.new()
+	hb.alignment = BoxContainer.ALIGNMENT_BEGIN
+
+	var l1 = Label.new()
+	l1.text = concepto
+	l1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l1.add_theme_font_size_override("font_size", 11)
+	l1.add_theme_color_override("font_color", Color(0.2, 0.2, 0.24))
+	hb.add_child(l1)
+
+	var l2 = Label.new()
+	l2.text = valor
+	l2.add_theme_font_size_override("font_size", 11)
+	l2.add_theme_color_override("font_color", Color(0.1, 0.1, 0.12))
+	hb.add_child(l2)
+
+	detalle_vb_contenido.add_child(hb)
+
+func _ocultar_modal_detalle() -> void:
+	if not detalle_modal or not detalle_modal.visible:
+		return
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(detalle_modal, "scale", Vector2(0.6, 0.6), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(detalle_modal, "modulate:a", 0.0, 0.15)
+	tw.chain().tween_callback(func():
+		detalle_modal.visible = false
+	)
+
 func _crear_tarjeta_jugador(jug: JugadorData) -> PanelContainer:
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(240, 40)
@@ -686,21 +879,18 @@ func _actualizar_hud() -> void:
 	for i in range(jugadores.size()):
 		var jug = jugadores[i]
 		var es_turno = (i == turno_actual)
-		var casilla_nom = casillas_data[jug.posicion].nombre.replace("\n", " ")
-		var info_lbl = player_cards[i].get_node("Info") as Label
-		var marker = "  🎯" if es_turno else ""
-		info_lbl.text = "%s   $%d   %s%s" % [jug.nombre, jug.dinero, casilla_nom, marker]
-
-		var style = player_cards[i].get_theme_stylebox("panel").duplicate() as StyleBoxFlat
-		if es_turno:
-			style.bg_color = Color(jug.color_ficha.r, jug.color_ficha.g, jug.color_ficha.b, 0.45)
-			style.border_color = Color(1.0, 0.85, 0.25)
-			style.set_border_width_all(4)
-		else:
-			style.bg_color = Color(jug.color_ficha.r, jug.color_ficha.g, jug.color_ficha.b, 0.15)
-			style.border_color = jug.color_ficha
-			style.set_border_width_all(1)
-		player_cards[i].add_theme_stylebox_override("panel", style)
+		if i < player_tags3d.size():
+			var tag = player_tags3d[i]
+			var marker = "🎯 " if es_turno else ""
+			tag.text = "%s%s\n💰 $%d" % [marker, jug.nombre, jug.dinero]
+			if es_turno:
+				tag.font_size = 40
+				tag.modulate = Color(1.0, 0.88, 0.3)
+				tag.outline_size = 12
+			else:
+				tag.font_size = 30
+				tag.modulate = jug.color_ficha
+				tag.outline_size = 8
 
 func _notificar(msg: String) -> void:
 	if notif_label:
