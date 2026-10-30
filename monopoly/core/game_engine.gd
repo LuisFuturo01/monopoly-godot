@@ -793,7 +793,7 @@ func _cmd_bid(pid: int, amount: int) -> String:
 	if phase() != AUCTION or pid != pending_actor():
 		return "No es tu turno de pujar"
 	if amount < min_bid():
-		return "La puja mínima es $%d" % min_bid()
+		return "La puja mínima es Bs %d" % min_bid()
 	if amount > int(player(pid)["cash"]):
 		return "Dinero insuficiente"
 	var a: Dictionary = s["auction"]

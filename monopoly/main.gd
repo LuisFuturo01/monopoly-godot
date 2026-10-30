@@ -57,6 +57,12 @@ func _show_menu(message: String = "") -> void:
 			menu.show_setup("ai")
 		"wifi":
 			menu.show_network("wifi")
+		"modes":
+			menu.show_modes()
+		"rules":
+			menu.show_setup("ai")
+			menu._tab = 1
+			menu._render_setup()
 
 
 func _start_demo() -> void:
@@ -67,6 +73,13 @@ func _start_demo() -> void:
 	var rules := RulesConfig.classic()
 	rules.speed_die = true
 	_start_game("local", seats, rules)
+	if _args.has("think"):
+		_controller.ai_think_time = float(_args["think"])
+	if _args.has("log"):
+		_controller.events_emitted.connect(func(evs):
+			for ev in evs:
+				if ev["type"] in ["jailed", "three_doubles", "bankrupt", "game_over", "jail_released", "debt"]:
+					print("LOG ronda=%d %s" % [int(_controller.engine.s["round"]), ev]))
 
 
 func _start_game(kind: String, seats: Array, rules: RulesConfig, snapshot: Dictionary = {}) -> void:
@@ -178,6 +191,11 @@ func _hud_test(panel: String) -> void:
 			for i in [6, 7, 9, 6, 7, 9]:
 				_controller.submit({"type": "build", "player": 0, "space": i})
 				await get_tree().create_timer(0.15).timeout
+		"victory":
+			e.player(1)["bankrupt"] = true
+			e.player(1)["cash"] = 0
+			e.player(2)["cash"] = 2350
+			e._game_over("bankruptcy")
 		"auction":
 			e.s["current"] = 1
 			e.s["phase"] = GameEngine.AUCTION

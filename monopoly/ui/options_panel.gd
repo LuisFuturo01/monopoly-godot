@@ -7,7 +7,7 @@ extends RefCounted
 static func build(on_close: Callable) -> Control:
 	var v := UiKit.vbox(14)
 	v.custom_minimum_size = Vector2(460, 0)
-	var title := UiKit.label("Opciones", 30, UiKit.ACCENT)
+	var title := UiKit.label("Opciones", 30, UiKit.HEADING)
 	v.add_child(title)
 
 	v.add_child(_section("Sonido"))

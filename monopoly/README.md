@@ -11,8 +11,11 @@ La versión anterior (ahora en `legacy/`, ignorada por Godot) mezclaba en un sol
 `GameManager.gd` de 1460 líneas la cámara, la UI, las animaciones y las reglas, y
 los datos de casilla guardaban referencias a nodos visuales. Eso impide red
 autoritativa, IA y una segunda vista, así que se rehízo desde cero. La ciudad del
-centro es procedural (calles, barrios, parque, nevados, teleférico y autos animados);
-no se usan modelos descargados.
+centro es procedural (avenidas con aceras y pasos de cebra, torres de vidrio, casas,
+parque con fuente, faroles, nevados, teleférico y autos animados); no se usan modelos
+descargados. Cada casilla tiene un cartel que gira hacia la cámara con una foto real
+del lugar (Wikimedia Commons, licencias libres; créditos en `data/places/CREDITS.md`).
+La moneda del juego es el boliviano (Bs).
 
 ```
 core/       Reglas puras (RefCounted, sin nodos). Testeables en headless.
@@ -50,12 +53,16 @@ tirar/terminar hasta que el destinatario responde.
 
 ## Reglas implementadas
 
-- Dobles con tirada extra; tres dobles → Retén sin cobrar sueldo.
-- Retén: pagar multa, salvoconducto o intentar dobles; al tercer fallo paga y mueve.
+- Dobles con tirada extra; tres dobles en el mismo turno → Retén sin cobrar sueldo.
+- Retén: "Pagar Bs 50 y tirar", "Usar salvoconducto y tirar" o "Intentar dobles"; si no
+  salen dobles pierdes el turno, y al tercer intento fallido pagas la multa y mueves.
+- La partida solo termina por quiebra (o por el límite de rondas si se elige).
 - 8 grupos de color, 4 teleféricos, 2 servicios (Luz y Agua). Alquiler doble con
   grupo completo sin edificar.
 - Rechazar una compra abre una subasta por turnos entre todos los jugadores activos.
-- Intercambio de dinero, propiedades y salvoconductos antes o después de tirar.
+- Intercambio de cualquier combinación de dinero, propiedades y salvoconductos antes o
+  después de tirar. La IA ofrece dinero o canjes de terreno por terreno (+ diferencia en
+  dinero) cuando a ambos les completa un grupo.
 - Construcción pareja, suministro limitado (32 casas / 12 hoteles), hotel = 4 casas
   (3 en modo rápido), venta pareja a mitad de precio.
 - Hipoteca al 50 %, levantar al 55 %. Quien recibe una propiedad hipotecada (por
@@ -104,7 +111,8 @@ $GODOT --headless --path . -- --net-join=127.0.0.1 --drop=8     # cliente que se
 ```
 
 Otros argumentos de depuración: `--shot=<png> --time=<s>` (captura y salir),
-`--page=profile|setup|wifi`, `--hud-test=manager|trade|auction|space|buy|build`, `--speed=<x>`.
+`--page=profile|setup|rules|modes|wifi`, `--hud-test=manager|trade|auction|space|buy|build|victory`,
+`--speed=<x>`, `--think=<s>` (pausa de la IA) y `--log` (registra Retén, deudas y quiebras).
 
 Opciones (menú y partida): volumen de música y efectos, vista 2D/3D, velocidad de
 animación, cámara que sigue a la ficha y registro de jugadas.

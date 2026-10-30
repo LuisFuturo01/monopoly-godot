@@ -8,9 +8,9 @@ signal events_emitted(events: Array)
 signal command_failed(message: String)
 
 const BOARD_PATH := "res://data/board_lapaz.json"
-const AI_THINK_TIME := 0.6
 ## Si la IA envía un comando inválido, intenta estas salidas seguras en orden.
-const AI_FALLBACKS := ["pay_debt", "bankrupt", "pass_bid", "decline", "trade_reject", "trade_cancel", "roll", "end_turn"]
+## Nunca incluye la quiebra: solo se declara si la deuda supera todo lo que puede reunir.
+const AI_FALLBACKS := ["pay_debt", "pass_bid", "decline", "trade_reject", "trade_cancel", "roll", "end_turn"]
 
 var board: Board
 var engine: GameEngine
@@ -20,6 +20,7 @@ var my_uuid := ""
 var ai := AiBrain.new()
 var player_events: EventPlayer
 
+var ai_think_time := 0.6
 var _ai_wait := 0.0
 
 
@@ -153,16 +154,21 @@ func _process(delta: float) -> void:
 		_ai_wait = 0.0
 		return
 	_ai_wait += delta
-	if _ai_wait < AI_THINK_TIME:
+	if _ai_wait < ai_think_time:
 		return
 	_ai_wait = 0.0
 	# Un humano desconectado lo juega temporalmente la IA de nivel medio.
-	var level := maxi(int(engine.player(pid)["ai"]), AiBrain.Level.MEDIUM)
+	var ai_level := int(engine.player(pid)["ai"])
+	var level := ai_level if ai_level >= 0 else AiBrain.Level.MEDIUM
 	var cmd := ai.decide(engine, pid, level)
-	if cmd.is_empty() or not _apply_silent(cmd):
-		for t in AI_FALLBACKS:
-			if _apply_silent({"type": t, "player": pid}):
-				return
+	if not cmd.is_empty() and _apply_silent(cmd):
+		return
+	push_warning("IA %d: comando inválido %s en fase %s" % [pid, cmd, engine.phase()])
+	for t in AI_FALLBACKS:
+		if _apply_silent({"type": t, "player": pid}):
+			return
+	if engine.phase() == GameEngine.DEBT and engine.liquidation_value(pid) < int(engine.s["debts"][0]["amount"]):
+		_apply_silent({"type": "bankrupt", "player": pid})
 
 
 ## Aplica un comando de la IA sin avisar fallos a la UI.

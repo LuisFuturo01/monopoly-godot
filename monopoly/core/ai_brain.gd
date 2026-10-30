@@ -252,6 +252,16 @@ func _find_trade(e: GameEngine, pid: int, level: int) -> Dictionary:
 		var holder := e.owner_of(missing)
 		if holder < 0 or e.houses_on(missing) > 0:
 			continue
+		var swap := _swap_candidate(e, pid, holder, group)
+		if swap >= 0:
+			# Terreno por terreno: a ambos les completa un grupo; se compensa la diferencia en dinero.
+			var diff := maxi(0, e.board.price(missing) - e.board.price(swap))
+			if cash - diff >= _reserve(e, pid, level):
+				return _cmd(pid, "trade_propose", {
+					"to": holder,
+					"give": {"cash": diff, "props": [swap], "cards": 0},
+					"get": {"cash": 0, "props": [missing], "cards": 0},
+				})
 		var premium := 1.8 if level == Level.HARD else 1.3
 		var offer := int(e.board.price(missing) * premium)
 		if cash - offer < _reserve(e, pid, level):
@@ -262,6 +272,25 @@ func _find_trade(e: GameEngine, pid: int, level: int) -> Dictionary:
 			"get": {"cash": 0, "props": [missing], "cards": 0},
 		})
 	return {}
+
+
+## Propiedad mía que le completaría a `other` un grupo distinto de `wanted`
+## (si fuera el mismo grupo, ambos se la devolverían turno tras turno).
+func _swap_candidate(e: GameEngine, pid: int, other: int, wanted: String) -> int:
+	for group in e.board.groups.keys():
+		if group == wanted:
+			continue
+		var members := e.board.group_members(group)
+		var theirs := 0
+		var mine := -1
+		for j in members:
+			if e.owner_of(j) == other:
+				theirs += 1
+			elif e.owner_of(j) == pid and e.houses_on(j) == 0:
+				mine = j
+		if mine >= 0 and theirs == members.size() - 1:
+			return mine
+	return -1
 
 
 func _accept_trade(e: GameEngine, pid: int, level: int, t: Dictionary) -> bool:

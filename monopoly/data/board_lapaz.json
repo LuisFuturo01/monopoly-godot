@@ -541,65 +541,65 @@
     "action": "jail_free"
    },
    {
-    "text": "Ganaste el concurso de morenada. Cobra $100.",
+    "text": "Ganaste el concurso de morenada. Cobra Bs 100.",
     "action": "money",
     "amount": 100
    },
    {
-    "text": "Dividendos de tu tienda en la Eloy Salmón. Cobra $50.",
+    "text": "Dividendos de tu tienda en la Eloy Salmón. Cobra Bs 50.",
     "action": "money",
     "amount": 50
    },
    {
-    "text": "Préstamo cooperativo liberado. Cobra $150.",
+    "text": "Préstamo cooperativo liberado. Cobra Bs 150.",
     "action": "money",
     "amount": 150
    },
    {
-    "text": "Multa por estacionar en doble fila. Paga $15.",
+    "text": "Multa por estacionar en doble fila. Paga Bs 15.",
     "action": "money",
     "amount": -15
    },
    {
-    "text": "Mantenimiento de tus inmuebles: $25 por casa y $100 por hotel.",
+    "text": "Mantenimiento de tus inmuebles: Bs 25 por casa y Bs 100 por hotel.",
     "action": "repairs",
     "house": 25,
     "hotel": 100
    },
    {
-    "text": "Te eligieron preste de la fiesta. Paga $50 a cada jugador.",
+    "text": "Te eligieron preste de la fiesta. Paga Bs 50 a cada jugador.",
     "action": "pay_each",
     "amount": 50
    },
    {
-    "text": "Granizada en la ciudad: arreglos de techo. Paga $40.",
+    "text": "Granizada en la ciudad: arreglos de techo. Paga Bs 40.",
     "action": "money",
     "amount": -40
    }
   ],
   "cabildo": [
    {
-    "text": "Bono del Cabildo vecinal. Cobra $200.",
+    "text": "Bono del Cabildo vecinal. Cobra Bs 200.",
     "action": "money",
     "amount": 200
    },
    {
-    "text": "Consulta médica. Paga $100.",
+    "text": "Consulta médica. Paga Bs 100.",
     "action": "money",
     "amount": -100
    },
    {
-    "text": "Vendiste miniaturas en la Feria de Alasitas. Cobra $100.",
+    "text": "Vendiste miniaturas en la Feria de Alasitas. Cobra Bs 100.",
     "action": "money",
     "amount": 100
    },
    {
-    "text": "¡Es tu cumpleaños! Cobra $10 de cada jugador.",
+    "text": "¡Es tu cumpleaños! Cobra Bs 10 de cada jugador.",
     "action": "collect_each",
     "amount": 10
    },
    {
-    "text": "Venció tu seguro de vida. Cobra $100.",
+    "text": "Venció tu seguro de vida. Cobra Bs 100.",
     "action": "money",
     "amount": 100
    },
@@ -617,43 +617,43 @@
     "target": 0
    },
    {
-    "text": "Herencia de tu tía de Oruro. Cobra $100.",
+    "text": "Herencia de tu tía de Oruro. Cobra Bs 100.",
     "action": "money",
     "amount": 100
    },
    {
-    "text": "Matrícula del colegio. Paga $50.",
+    "text": "Matrícula del colegio. Paga Bs 50.",
     "action": "money",
     "amount": -50
    },
    {
-    "text": "Asesoría a la junta vecinal. Cobra $25.",
+    "text": "Asesoría a la junta vecinal. Cobra Bs 25.",
     "action": "money",
     "amount": 25
    },
    {
-    "text": "Arreglo de calles del barrio: $40 por casa y $115 por hotel.",
+    "text": "Arreglo de calles del barrio: Bs 40 por casa y Bs 115 por hotel.",
     "action": "repairs",
     "house": 40,
     "hotel": 115
    },
    {
-    "text": "Devolución de impuestos. Cobra $20.",
+    "text": "Devolución de impuestos. Cobra Bs 20.",
     "action": "money",
     "amount": 20
    },
    {
-    "text": "Premio de comparsa en el Gran Poder. Cobra $10.",
+    "text": "Premio de comparsa en el Gran Poder. Cobra Bs 10.",
     "action": "money",
     "amount": 10
    },
    {
-    "text": "Vendiste acciones. Cobra $50.",
+    "text": "Vendiste acciones. Cobra Bs 50.",
     "action": "money",
     "amount": 50
    },
    {
-    "text": "Papeleta de tránsito. Paga $50.",
+    "text": "Papeleta de tránsito. Paga Bs 50.",
     "action": "money",
     "amount": -50
    }

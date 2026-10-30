@@ -128,7 +128,7 @@ func _build() -> void:
 	add_child(_bottom)
 	var bv := UiKit.vbox(8)
 	_bottom.add_child(bv)
-	_status = UiKit.label("", 19)
+	_status = UiKit.label("", 19, UiKit.TEXT, true)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bv.add_child(_status)
 	_actions = HFlowContainer.new()
@@ -171,7 +171,7 @@ func _build() -> void:
 	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_overlay)
 
-	_toast = UiKit.label("", 17, Color.WHITE)
+	_toast = UiKit.label("", 17, Color.WHITE, true)
 	_toast.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_toast.offset_top = 86
@@ -257,7 +257,7 @@ func _refresh_players() -> void:
 			tags.append("desconectado (IA)")
 		if not p["jail_cards"].is_empty():
 			tags.append("salvoconducto x%d" % p["jail_cards"].size())
-		var cash_l := UiKit.label("$%d" % int(shown.get(pid, p["cash"])), 20, UiKit.GOOD.darkened(0.1))
+		var cash_l := UiKit.label("Bs %d" % int(shown.get(pid, p["cash"])), 20, UiKit.GOOD.darkened(0.1))
 		cash_l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		col.add_child(cash_l)
 		if not tags.is_empty():
@@ -289,12 +289,12 @@ func _refresh_actions() -> void:
 				text += " — ¡dobles, tira otra vez!"
 		GameEngine.AWAIT_BUY:
 			var i: int = en.s["pending_buy"]
-			text = "%s puede comprar %s por $%d" % [who, _space_name(i), controller.board.price(i)]
+			text = "%s puede comprar %s por Bs %d" % [who, _space_name(i), controller.board.price(i)]
 		GameEngine.AUCTION:
 			text = "Subasta de %s — puja %s" % [_space_name(int(en.s["auction"]["space"])), who]
 		GameEngine.DEBT:
 			var d: Dictionary = en.s["debts"][0]
-			text = "%s debe $%d a %s. Hipoteca o vende para pagar." % [who, int(d["amount"]), _plain(int(d["creditor"]))]
+			text = "%s debe Bs %d a %s. Hipoteca o vende para pagar." % [who, int(d["amount"]), _plain(int(d["creditor"]))]
 		GameEngine.POST_ROLL:
 			text = "%s: gestiona tus propiedades o termina el turno" % who
 	if not en.s["trade"].is_empty():
@@ -312,14 +312,19 @@ func _refresh_actions() -> void:
 	for a in legal:
 		match a:
 			"roll":
-				_actions.add_child(UiKit.button("Tirar dados", func(): _submit({"type": "roll", "player": local}), true))
+				var label := "Intentar dobles" if pc["in_jail"] else "Tirar dados"
+				_actions.add_child(UiKit.button(label, func(): _submit({"type": "roll", "player": local}), true))
 			"pay_jail":
-				_actions.add_child(UiKit.button("Pagar multa $%d" % controller.board.jail_fine, func(): _submit({"type": "pay_jail", "player": local})))
+				_actions.add_child(UiKit.button("Pagar Bs %d y tirar" % controller.board.jail_fine, func():
+					_submit({"type": "pay_jail", "player": local})
+					_submit({"type": "roll", "player": local}), true, UiKit.ACCENT_2))
 			"use_jail_card":
-				_actions.add_child(UiKit.button("Usar salvoconducto", func(): _submit({"type": "use_jail_card", "player": local})))
+				_actions.add_child(UiKit.button("Usar salvoconducto y tirar", func():
+					_submit({"type": "use_jail_card", "player": local})
+					_submit({"type": "roll", "player": local})))
 			"buy":
 				var i: int = en.s["pending_buy"]
-				_actions.add_child(UiKit.button("Comprar $%d" % controller.board.price(i), func(): _submit({"type": "buy", "player": local}), true))
+				_actions.add_child(UiKit.button("Comprar Bs %d" % controller.board.price(i), func(): _submit({"type": "buy", "player": local}), true))
 			"decline":
 				_actions.add_child(UiKit.button("No comprar (subasta)", func(): _submit({"type": "decline", "player": local})))
 			"end_turn":
@@ -333,7 +338,7 @@ func _refresh_actions() -> void:
 	if en.phase() in [GameEngine.PRE_ROLL, GameEngine.POST_ROLL, GameEngine.DEBT, GameEngine.AWAIT_BUY] and not en.properties_of(local).is_empty() and "mortgage" in legal:
 		_actions.add_child(UiKit.button("Mis propiedades (%d)" % en.properties_of(local).size(), _show_manager))
 	if en.phase() == GameEngine.DEBT and int(pc["cash"]) < int(en.s["debts"][0]["amount"]):
-		_status.text += "  Te faltan $%d." % (int(en.s["debts"][0]["amount"]) - int(pc["cash"]))
+		_status.text += "  Te faltan Bs %d." % (int(en.s["debts"][0]["amount"]) - int(pc["cash"]))
 
 
 func _check_handoff(local: int) -> void:
@@ -375,13 +380,13 @@ func _refresh_auction() -> void:
 	_auction_panel.add_child(v)
 	var head := UiKit.hbox(8)
 	head.add_child(UiKit.swatch(controller.board.space_color(i), Vector2(10, 28)))
-	var title := UiKit.label("SUBASTA · %s" % _space_name(i), 20, UiKit.ACCENT)
+	var title := UiKit.label("SUBASTA · %s" % _space_name(i), 20, UiKit.HEADING)
 	title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	head.add_child(title)
 	v.add_child(head)
-	v.add_child(UiKit.label("Precio de lista $%d" % controller.board.price(i), 15, UiKit.MUTED))
+	v.add_child(UiKit.label("Precio de lista Bs %d" % controller.board.price(i), 15, UiKit.MUTED))
 	var hb := int(a["high_bidder"])
-	v.add_child(UiKit.label("Puja más alta: %s" % ("$%d de %s" % [int(a["high"]), _plain(hb)] if hb >= 0 else "ninguna"), 18))
+	v.add_child(UiKit.label("Puja más alta: %s" % ("Bs %d de %s" % [int(a["high"]), _plain(hb)] if hb >= 0 else "ninguna"), 18))
 	var names := []
 	for pid in a["bidders"]:
 		names.append(_plain(int(pid)))
@@ -399,7 +404,7 @@ func _refresh_auction() -> void:
 		var amount: int = base + extra
 		if amount > cash:
 			break
-		row.add_child(UiKit.button("$%d" % amount, func(): Sfx.play("bid"); _submit({"type": "bid", "player": local, "amount": amount}), extra == 0))
+		row.add_child(UiKit.button("Bs %d" % amount, func(): Sfx.play("bid"); _submit({"type": "bid", "player": local, "amount": amount}), extra == 0))
 	row.add_child(UiKit.button("Retirarme", func(): _submit({"type": "pass_bid", "player": local})))
 
 
@@ -416,9 +421,11 @@ func _refresh_trade() -> void:
 	_trade_panel.add_child(v)
 	var from := int(t["from"])
 	var to := int(t["to"])
-	v.add_child(UiKit.label("Propuesta de %s para %s" % [_plain(from), _plain(to)], 19, UiKit.ACCENT))
-	v.add_child(UiKit.label("%s entrega: %s" % [_plain(from), _offer_text(t["give"])], 16))
-	v.add_child(UiKit.label("%s entrega: %s" % [_plain(to), _offer_text(t["get"])], 16))
+	v.add_child(UiKit.label("Propuesta de %s para %s" % [_plain(from), _plain(to)], 19, UiKit.HEADING))
+	v.add_child(UiKit.label("%s entrega:" % _plain(from), 15, UiKit.MUTED))
+	v.add_child(_offer_chips(t["give"]))
+	v.add_child(UiKit.label("%s entrega:" % _plain(to), 15, UiKit.MUTED))
+	v.add_child(_offer_chips(t["get"]))
 	var row := UiKit.hbox(8)
 	v.add_child(row)
 	if controller.is_local_human(to):
@@ -431,10 +438,26 @@ func _refresh_trade() -> void:
 		row.add_child(UiKit.label("Esperando respuesta…", 15, UiKit.MUTED))
 
 
+## Chips de colores: cada propiedad con el color de su grupo, el dinero en dorado.
+func _offer_chips(o: Dictionary) -> Control:
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 6)
+	flow.add_theme_constant_override("v_separation", 6)
+	if int(o["cash"]) > 0:
+		flow.add_child(UiKit.chip("Bs %d" % int(o["cash"]), UiKit.GOLD))
+	for i in o["props"]:
+		flow.add_child(UiKit.chip(_space_name(int(i)), controller.board.space_color(int(i))))
+	if int(o["cards"]) > 0:
+		flow.add_child(UiKit.chip("%d salvoconducto(s)" % int(o["cards"]), UiKit.ACCENT_2))
+	if flow.get_child_count() == 0:
+		flow.add_child(UiKit.chip("nada", UiKit.SOFT))
+	return flow
+
+
 func _offer_text(o: Dictionary) -> String:
 	var parts := []
 	if int(o["cash"]) > 0:
-		parts.append("$%d" % int(o["cash"]))
+		parts.append("Bs %d" % int(o["cash"]))
 	for i in o["props"]:
 		parts.append(_space_name(int(i)))
 	if int(o["cards"]) > 0:
@@ -455,7 +478,7 @@ func _show_trade_composer() -> void:
 		return
 	var v := UiKit.vbox(10)
 	v.custom_minimum_size = Vector2(minf(720, get_viewport_rect().size.x - 40), 0)
-	v.add_child(UiKit.label("Negociar", 24, UiKit.ACCENT))
+	v.add_child(UiKit.label("Negociar", 24, UiKit.HEADING))
 	var target := OptionButton.new()
 	for pid in others:
 		target.add_item(_plain(pid), pid)
@@ -463,6 +486,22 @@ func _show_trade_composer() -> void:
 	var cols := UiKit.hbox(16)
 	v.add_child(cols)
 	var state := {"give": {}, "get": {}}
+	var balance := UiKit.label("", 15, UiKit.MUTED)
+	## Valor de lista de lo que das frente a lo que recibes, para negociar con criterio.
+	var update_balance := func():
+		var sums := {}
+		for key in ["give", "get"]:
+			var d: Dictionary = state[key]
+			if d.is_empty():
+				sums[key] = 0
+				continue
+			var total := int(d["cash"].value)
+			for cb in d["checks"]:
+				if cb.button_pressed:
+					var sp: int = cb.get_meta("space")
+					total += controller.board.mortgage_value(sp) if en.is_mortgaged(sp) else controller.board.price(sp)
+			sums[key] = total
+		balance.text = "Das ≈ Bs %d   ·   Recibes ≈ Bs %d" % [sums["give"], sums["get"]]
 	var build_side := func(owner_pid: int, key: String, title: String) -> VBoxContainer:
 		var col := UiKit.vbox(6)
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -475,15 +514,26 @@ func _show_trade_composer() -> void:
 		col.add_child(sc)
 		for i in en.properties_of(owner_pid):
 			var cb := CheckBox.new()
-			cb.text = _space_name(i) + (" (hip.)" if en.is_mortgaged(i) else "")
+			cb.text = _space_name(i) + (" (hipotecada)" if en.is_mortgaged(i) else "")
 			cb.disabled = en.houses_on(i) > 0
+			cb.tooltip_text = "Tiene edificios: véndelos primero" if cb.disabled else ""
 			cb.set_meta("space", i)
+			var tint := controller.board.space_color(i)
+			cb.add_theme_stylebox_override("normal", UiKit.box(tint.lerp(Color.WHITE, 0.82), 14, 12, 8, tint, 0))
+			cb.add_theme_stylebox_override("hover", UiKit.box(tint.lerp(Color.WHITE, 0.7), 14, 12, 8))
+			cb.add_theme_stylebox_override("pressed", UiKit.box(tint.lerp(Color.WHITE, 0.55), 14, 12, 8, tint, 3))
+			cb.add_theme_stylebox_override("hover_pressed", UiKit.box(tint.lerp(Color.WHITE, 0.5), 14, 12, 8, tint, 3))
+			var sb: StyleBoxFlat = cb.get_theme_stylebox("normal")
+			sb.border_width_left = 8
+			sb.border_color = tint
+			cb.toggled.connect(func(_on): update_balance.call())
 			list.add_child(cb)
 			checks.append(cb)
 		var cash := SpinBox.new()
 		cash.max_value = int(en.player(owner_pid)["cash"])
 		cash.step = 10
-		cash.prefix = "$"
+		cash.prefix = "Bs "
+		cash.value_changed.connect(func(_v): update_balance.call())
 		col.add_child(cash)
 		var cards := SpinBox.new()
 		cards.max_value = en.player(owner_pid)["jail_cards"].size()
@@ -509,6 +559,8 @@ func _show_trade_composer() -> void:
 			if cb.button_pressed:
 				props.append(cb.get_meta("space"))
 		return {"cash": int(d["cash"].value), "props": props, "cards": int(d["cards"].value)}
+	v.add_child(balance)
+	update_balance.call()
 	var row := UiKit.hbox(10)
 	row.alignment = BoxContainer.ALIGNMENT_END
 	v.add_child(row)
@@ -538,35 +590,35 @@ func _show_space(i: int) -> void:
 	match sp["type"]:
 		"street":
 			var r: Array = sp["rents"]
-			_row(v, "Alquiler", "$%d" % r[0])
-			_row(v, "Con el grupo completo", "$%d" % (int(r[0]) * 2))
+			_row(v, "Alquiler", "Bs %d" % r[0])
+			_row(v, "Con el grupo completo", "Bs %d" % (int(r[0]) * 2))
 			for k in range(1, 5):
-				_row(v, "Con %d casa%s" % [k, "" if k == 1 else "s"], "$%d" % r[k])
-			_row(v, "Con hotel", "$%d" % r[5])
-			_row(v, "Cada casa cuesta", "$%d" % b.house_cost(i))
+				_row(v, "Con %d casa%s" % [k, "" if k == 1 else "s"], "Bs %d" % r[k])
+			_row(v, "Con hotel", "Bs %d" % r[5])
+			_row(v, "Cada casa cuesta", "Bs %d" % b.house_cost(i))
 		"transit":
 			for k in 4:
-				_row(v, "Con %d teleférico%s" % [k + 1, "" if k == 0 else "s"], "$%d" % sp["rents"][k])
+				_row(v, "Con %d teleférico%s" % [k + 1, "" if k == 0 else "s"], "Bs %d" % sp["rents"][k])
 		"utility":
 			_row(v, "Con 1 servicio", "%d × dados" % sp["multipliers"][0])
 			_row(v, "Con ambos", "%d × dados" % sp["multipliers"][1])
 		"tax":
-			v.add_child(UiKit.label("Paga $%d al caer aquí." % int(sp["amount"]), 16))
+			v.add_child(UiKit.label("Paga Bs %d al caer aquí." % int(sp["amount"]), 16, UiKit.TEXT, true))
 		"card":
-			v.add_child(UiKit.label("Roba una carta de %s." % ("Destino" if sp["deck"] == "destino" else "Cabildo"), 16))
+			v.add_child(UiKit.label("Roba una carta de %s." % ("Destino" if sp["deck"] == "destino" else "Cabildo"), 16, UiKit.TEXT, true))
 		"go":
-			v.add_child(UiKit.label("Cobra $%d cada vez que pases." % b.salary, 16))
+			v.add_child(UiKit.label("Cobra Bs %d cada vez que pases." % b.salary, 16, UiKit.TEXT, true))
 		"jail":
-			v.add_child(UiKit.label("Si solo estás de visita, no pasa nada.", 16))
+			v.add_child(UiKit.label("Si solo estás de visita, no pasa nada.", 16, UiKit.TEXT, true))
 		"free":
-			v.add_child(UiKit.label("Descanso. Con la regla del bote, cobras lo acumulado.", 16))
+			v.add_child(UiKit.label("Descanso. Con la regla del bote, cobras lo acumulado.", 16, UiKit.TEXT, true))
 		"gotojail":
-			v.add_child(UiKit.label("Vas directo al Retén sin cobrar sueldo.", 16))
+			v.add_child(UiKit.label("Vas directo al Retén sin cobrar sueldo.", 16, UiKit.TEXT, true))
 	if b.is_property(i):
-		_row(v, "Precio", "$%d" % b.price(i))
-		_row(v, "Hipoteca", "$%d" % b.mortgage_value(i))
+		_row(v, "Precio", "Bs %d" % b.price(i))
+		_row(v, "Hipoteca", "Bs %d" % b.mortgage_value(i))
 		var own := en.owner_of(i)
-		v.add_child(UiKit.label("Dueño: %s%s" % [_plain(own) if own >= 0 else "nadie", " (hipotecada)" if en.is_mortgaged(i) else ""], 16, UiKit.ACCENT))
+		v.add_child(UiKit.label("Dueño: %s%s" % [_plain(own) if own >= 0 else "nadie", " (hipotecada)" if en.is_mortgaged(i) else ""], 16, UiKit.HEADING))
 		var me := controller.local_actor()
 		if own >= 0 and own == me:
 			var row := HFlowContainer.new()
@@ -576,7 +628,7 @@ func _show_space(i: int) -> void:
 	if _modal_kind == "buy_pending":
 		var me2 := controller.local_actor()
 		var row2 := UiKit.hbox(10)
-		var buy := UiKit.button("Comprar $%d" % b.price(i), func():
+		var buy := UiKit.button("Comprar Bs %d" % b.price(i), func():
 			_close_modal()
 			_submit({"type": "buy", "player": me2}), true, UiKit.GOOD)
 		buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -589,7 +641,7 @@ func _show_space(i: int) -> void:
 		row2.add_child(auc)
 		v.add_child(row2)
 		if buy.disabled:
-			v.add_child(UiKit.label("No te alcanza: hipoteca algo desde «Mis propiedades» o súbastala.", 14, UiKit.DANGER))
+			v.add_child(UiKit.label("No te alcanza: hipoteca algo desde «Mis propiedades» o súbastala.", 14, UiKit.DANGER, true))
 		_open_modal(UiKit.panel(v), "buy", i)
 		return
 	v.add_child(UiKit.button("Cerrar", _close_modal))
@@ -611,10 +663,10 @@ func _manage_buttons(row: Control, me: int, i: int) -> void:
 	var en := e()
 	var legal := en.legal_actions(me)
 	var specs := [
-		["build", "+ Casa ($%d)" % controller.board.house_cost(i), en.can_build(me, i)],
+		["build", "+ Casa (Bs %d)" % controller.board.house_cost(i), en.can_build(me, i)],
 		["sell_building", "− Casa", en.can_sell_building(me, i)],
 		["mortgage", "Hipotecar", en.can_mortgage(me, i)],
-		["unmortgage", "Levantar ($%d)" % controller.board.unmortgage_cost(i), en.can_unmortgage(me, i)],
+		["unmortgage", "Levantar (Bs %d)" % controller.board.unmortgage_cost(i), en.can_unmortgage(me, i)],
 	]
 	for s in specs:
 		if not controller.board.is_street(i) and s[0] in ["build", "sell_building"]:
@@ -638,7 +690,7 @@ func _show_manager() -> void:
 		return
 	var v := UiKit.vbox(6)
 	v.custom_minimum_size = Vector2(minf(640, get_viewport_rect().size.x - 40), 0)
-	v.add_child(UiKit.label("Mis propiedades — efectivo $%d" % int(en.player(me)["cash"]), 22, UiKit.ACCENT))
+	v.add_child(UiKit.label("Mis propiedades — efectivo Bs %d" % int(en.player(me)["cash"]), 22, UiKit.HEADING))
 	var sc := ScrollContainer.new()
 	sc.custom_minimum_size = Vector2(0, minf(440, get_viewport_rect().size.y - 220))
 	var list := UiKit.vbox(6)
@@ -689,7 +741,7 @@ func _close_modal() -> void:
 func _confirm(msg: String, on_yes: Callable) -> void:
 	var v := UiKit.vbox(12)
 	v.custom_minimum_size = Vector2(380, 0)
-	v.add_child(UiKit.label(msg, 19))
+	v.add_child(UiKit.label(msg, 19, UiKit.TEXT, true))
 	var row := UiKit.hbox(10)
 	row.alignment = BoxContainer.ALIGNMENT_END
 	row.add_child(UiKit.button("Cancelar", _close_modal))
@@ -715,7 +767,7 @@ func _show_game_over() -> void:
 	var v := UiKit.vbox(10)
 	v.custom_minimum_size = Vector2(420, 0)
 	var w := int(en.s["winner"])
-	var title := UiKit.label("¡%s gana!" % _plain(w) if w >= 0 else "Fin de la partida", 30, UiKit.ACCENT)
+	var title := UiKit.label("¡%s gana!" % _plain(w) if w >= 0 else "Fin de la partida", 30, UiKit.HEADING)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
 	var ranking := []
@@ -730,7 +782,7 @@ func _show_game_over() -> void:
 		var l := UiKit.label(Profile.label_for(r["p"]), 18)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(l)
-		row.add_child(UiKit.label("quiebra" if r["p"]["bankrupt"] else "$%d" % r["worth"], 18, UiKit.MUTED if r["p"]["bankrupt"] else UiKit.ACCENT))
+		row.add_child(UiKit.label("quiebra" if r["p"]["bankrupt"] else "Bs %d" % r["worth"], 18, UiKit.MUTED if r["p"]["bankrupt"] else UiKit.GOOD))
 		v.add_child(row)
 		pos += 1
 	v.add_child(UiKit.label("Patrimonio = efectivo + propiedades + edificios", 13, UiKit.MUTED))
@@ -753,12 +805,12 @@ func _on_event(ev: Dictionary) -> void:
 		_show_card(ev)
 
 
-## Aviso flotante "+$200" / "−$50" bajo la tarjeta del jugador.
+## Aviso flotante "+Bs 200" / "−Bs 50" bajo la tarjeta del jugador.
 func _money_float(pid: int, delta: int) -> void:
 	var card: Control = _player_cards.get(pid)
 	if card == null:
 		return
-	var l := UiKit.label(("+$%d" if delta > 0 else "−$%d") % absi(delta), 22, UiKit.GOOD if delta > 0 else UiKit.DANGER)
+	var l := UiKit.label(("+Bs %d" if delta > 0 else "−Bs %d") % absi(delta), 22, UiKit.GOOD if delta > 0 else UiKit.DANGER)
 	l.add_theme_constant_override("outline_size", 6)
 	l.add_theme_color_override("font_outline_color", Color.WHITE)
 	l.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -788,7 +840,7 @@ func _show_card(ev: Dictionary) -> void:
 	var t := UiKit.label("DESTINO" if destino else "CABILDO", 22, col.darkened(0.3))
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
-	var body := UiKit.label(ev["text"], 19, Color(0.12, 0.12, 0.14))
+	var body := UiKit.label(ev["text"], 19, UiKit.TEXT, true)
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(body)
 	_card_panel.visible = true
@@ -809,16 +861,16 @@ func _describe(ev: Dictionary) -> String:
 			var d: Array = ev["dice"]
 			var s := "%s tira %d + %d" % [_pname(int(ev["player"])), d[0], d[1]]
 			if int(d[2]) > 0:
-				s += " · turbo " + (str(d[2]) if int(d[2]) <= 3 else ("»" if int(d[2]) == GameEngine.SPEED_BOLT else "$"))
+				s += " · turbo " + (str(d[2]) if int(d[2]) <= 3 else ("»" if int(d[2]) == GameEngine.SPEED_BOLT else "Bs"))
 			return s + (" [color=#e17055]¡dobles![/color]" if ev["double"] else "")
 		"landed":
 			return "%s cae en %s" % [_pname(int(ev["player"])), _space_name(int(ev["space"]))]
 		"bought":
-			return "%s compra %s por $%d" % [_pname(int(ev["player"])), _space_name(int(ev["space"])), int(ev["price"])]
+			return "%s compra %s por Bs %d" % [_pname(int(ev["player"])), _space_name(int(ev["space"])), int(ev["price"])]
 		"rent_due":
-			return "%s paga $%d de alquiler a %s" % [_pname(int(ev["player"])), int(ev["amount"]), _pname(int(ev["owner"]))]
+			return "%s paga Bs %d de alquiler a %s" % [_pname(int(ev["player"])), int(ev["amount"]), _pname(int(ev["owner"]))]
 		"tax_due":
-			return "%s paga $%d (%s)" % [_pname(int(ev["player"])), int(ev["amount"]), _space_name(int(ev["space"]))]
+			return "%s paga Bs %d (%s)" % [_pname(int(ev["player"])), int(ev["amount"]), _space_name(int(ev["space"]))]
 		"card_drawn":
 			return "%s · %s: %s" % [_pname(int(ev["player"])), "Destino" if ev["deck"] == "destino" else "Cabildo", ev["text"]]
 		"jailed":
@@ -832,13 +884,13 @@ func _describe(ev: Dictionary) -> String:
 		"auction_started":
 			return "[color=#e17055]Subasta de %s[/color]" % _space_name(int(ev["space"]))
 		"bid":
-			return "%s puja $%d" % [_pname(int(ev["player"])), int(ev["amount"])]
+			return "%s puja Bs %d" % [_pname(int(ev["player"])), int(ev["amount"])]
 		"bid_pass":
 			return "%s se retira de la puja" % _pname(int(ev["player"]))
 		"auction_ended":
 			if int(ev["winner"]) < 0:
 				return "Nadie compró %s" % _space_name(int(ev["space"]))
-			return "%s gana %s por $%d" % [_pname(int(ev["winner"])), _space_name(int(ev["space"])), int(ev["amount"])]
+			return "%s gana %s por Bs %d" % [_pname(int(ev["winner"])), _space_name(int(ev["space"])), int(ev["amount"])]
 		"built":
 			return "%s construye en %s" % [_pname(int(ev["player"])), _space_name(int(ev["space"]))]
 		"sold_building":
@@ -848,7 +900,7 @@ func _describe(ev: Dictionary) -> String:
 		"unmortgaged":
 			return "%s levanta la hipoteca de %s" % [_pname(int(ev["player"])), _space_name(int(ev["space"]))]
 		"debt":
-			return "[color=#e05a4a]%s debe $%d[/color]" % [_pname(int(ev["debtor"])), int(ev["amount"])]
+			return "[color=#e05a4a]%s debe Bs %d[/color]" % [_pname(int(ev["debtor"])), int(ev["amount"])]
 		"bankrupt":
 			return "[color=#e05a4a]%s quiebra[/color]" % _pname(int(ev["player"]))
 		"trade_proposed":
@@ -858,10 +910,10 @@ func _describe(ev: Dictionary) -> String:
 		"speed_bolt":
 			return "Dado turbo: %s salta a %s" % [_pname(int(ev["player"])), _space_name(int(ev["target"]))]
 		"pot_collected":
-			return "%s se lleva el bote de $%d" % [_pname(int(ev["player"])), int(ev["amount"])]
+			return "%s se lleva el bote de Bs %d" % [_pname(int(ev["player"])), int(ev["amount"])]
 		"money":
 			if ev["reason"] == "Sueldo":
-				return "%s cobra $%d de sueldo" % [_pname(int(ev["player"])), int(ev["delta"])]
+				return "%s cobra Bs %d de sueldo" % [_pname(int(ev["player"])), int(ev["delta"])]
 		"connection":
 			return "%s %s" % [_pname(int(ev["player"])), "volvió a conectarse" if ev["connected"] else "se desconectó: la IA toma el control"]
 		"game_over":

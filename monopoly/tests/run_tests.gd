@@ -414,6 +414,7 @@ func test_ai_simulation() -> void:
 			seats.append({"name": "IA%d" % k, "ai": (k + g) % 3})
 		e.new_game(seats, 1000 + g)
 		var cmds := 0
+		var trades_seen := 0
 		while not e.is_over() and cmds < 30000:
 			var pid := e.pending_actor()
 			var level: int = e.player(pid)["ai"]
@@ -421,6 +422,8 @@ func test_ai_simulation() -> void:
 			if cmd.is_empty():
 				check(false, "IA sin decisión en fase %s" % e.phase())
 				break
+			if cmd["type"] == "trade_accept":
+				trades_seen += 1
 			var r := e.apply(cmd)
 			if not r["ok"]:
 				check(false, "IA envió comando inválido %s: %s (fase %s)" % [cmd, r["error"], e.phase()])
@@ -429,6 +432,11 @@ func test_ai_simulation() -> void:
 			if not _invariants(e):
 				break
 		total_cmds += cmds
+		if not e.is_over():
+			var owners := {}
+			for i in board.property_indices():
+				owners[e.owner_of(i)] = owners.get(e.owner_of(i), 0) + 1
+			print("    sin terminar: partida %d reglas=%d ronda=%d fase=%s activos=%s dueños=%s trades=%d" % [g, g % configs.size(), int(e.s["round"]), e.phase(), e.active_players(), owners, trades_seen])
 		if e.is_over():
 			finished += 1
 			var w := int(e.s["winner"])

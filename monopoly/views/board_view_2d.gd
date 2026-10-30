@@ -206,9 +206,9 @@ func _draw_space(i: int) -> void:
 			draw_string(_font, Vector2(-lw / 2, lh * 0.12 + fs), icon, HORIZONTAL_ALIGNMENT_CENTER, lw, int(fs * 1.9), INK.lerp(PAPER, 0.25))
 		var price_text := ""
 		if b.is_property(i):
-			price_text = "$%d" % b.price(i)
+			price_text = "Bs %d" % b.price(i)
 		elif sp["type"] == "tax":
-			price_text = "Paga $%d" % int(sp["amount"])
+			price_text = "Paga Bs %d" % int(sp["amount"])
 		if price_text != "":
 			draw_string(_font, Vector2(-lw / 2, lh / 2 - 6), price_text, HORIZONTAL_ALIGNMENT_CENTER, lw, fs, INK)
 	# Dueño e hipoteca
@@ -228,13 +228,13 @@ func _draw_corner(i: int, sp: Dictionary, lw: float, lh: float) -> void:
 	var tiles := {"go": Color("#55efc4"), "jail": Color("#fdcb6e"), "free": Color("#74b9ff"), "gotojail": Color("#ff7675")}
 	draw_rect(Rect2(-lw / 2, -lh / 2, lw, lh), tiles.get(sp["type"], PAPER))
 	var fs := maxi(8, int(_scale * 0.2))
-	var labels := {"go": "SALIDA\ncobra $%d" % controller.board.salary, "jail": "RETÉN\nde visita", "free": "MIRADOR", "gotojail": "¡AL\nRETÉN!"}
+	var labels := {"go": "SALIDA\ncobra Bs %d" % controller.board.salary, "jail": "RETÉN\nde visita", "free": "MIRADOR", "gotojail": "¡AL\nRETÉN!"}
 	var icon := {"go": "<<<", "jail": "| | |", "free": "*", "gotojail": "!"}
 	var t: String = labels.get(sp["type"], sp["name"])
 	draw_multiline_string(_font, Vector2(-lw / 2 + 2, -lh / 2 + fs * 1.6), t, HORIZONTAL_ALIGNMENT_CENTER, lw - 4, fs, 3, INK)
 	draw_string(_font, Vector2(-lw / 2, lh * 0.32), icon.get(sp["type"], ""), HORIZONTAL_ALIGNMENT_CENTER, lw, fs * 2, Color(0.75, 0.15, 0.12))
 	if sp["type"] == "free" and controller.engine.rules.free_parking_pot:
-		draw_string(_font, Vector2(-lw / 2, lh / 2 - 6), "Bote $%d" % int(controller.engine.s["pot"]), HORIZONTAL_ALIGNMENT_CENTER, lw, fs, INK)
+		draw_string(_font, Vector2(-lw / 2, lh / 2 - 6), "Bote Bs %d" % int(controller.engine.s["pot"]), HORIZONTAL_ALIGNMENT_CENTER, lw, fs, INK)
 
 
 func _icon_for(sp: Dictionary) -> String:
@@ -246,7 +246,7 @@ func _icon_for(sp: Dictionary) -> String:
 		"card":
 			return "?" if sp["deck"] == "destino" else "!"
 		"tax":
-			return "$"
+			return "Bs"
 	return ""
 
 
@@ -324,7 +324,7 @@ func _draw_dice(board_px: float) -> void:
 		draw_rect(rect, INK, false, 1.5)
 		if k == 2:
 			var face := int(d[2])
-			var txt := str(face) if face <= 3 else ("»" if face == GameEngine.SPEED_BOLT else "$")
+			var txt := str(face) if face <= 3 else ("»" if face == GameEngine.SPEED_BOLT else "Bs")
 			draw_string(_font, rect.position + Vector2(0, sz * 0.72), txt, HORIZONTAL_ALIGNMENT_CENTER, sz, int(sz * 0.7), Color.WHITE)
 		else:
 			_draw_pips(rect, int(d[k]))

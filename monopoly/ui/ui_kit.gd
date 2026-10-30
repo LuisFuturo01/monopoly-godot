@@ -1,21 +1,26 @@
 class_name UiKit
 extends RefCounted
-## Tema claro y juvenil compartido por menú y HUD: tarjetas blancas con sombra suave,
-## botones tipo píldora grandes (>= 52 px de alto para dedos) y acentos de color vivos.
+## Tema compartido por menú y HUD: azul marino y verde azulado con acentos dorados,
+## tarjetas blancas con sombra suave, botones píldora grandes (>= 54 px) que reaccionan
+## al pasar el cursor y al presionar, y entradas animadas.
 
+const NAVY := Color("#13233f")
 const PANEL := Color("#ffffff")
-const SOFT := Color("#f1f2f6")
-const TEXT := Color("#2d3436")
-const MUTED := Color("#7f8c8d")
-const ACCENT := Color("#6c5ce7")     # violeta: acción principal
-const ACCENT_2 := Color("#00cec9")   # menta
-const GOLD := Color("#fdcb6e")
-const CORAL := Color("#ff7675")
-const DANGER := Color("#e84357")
-const GOOD := Color("#00b894")
+const SOFT := Color("#eef2f7")
+const TEXT := Color("#13233f")
+const HEADING := Color("#13233f")
+const MUTED := Color("#6b7a90")
+const ACCENT := Color("#f2a541")     # dorado: acción principal
+const ACCENT_2 := Color("#1f9e89")   # verde azulado
+const GOLD := Color("#f2a541")
+const CORAL := Color("#e8735a")
+const DANGER := Color("#d64550")
+const GOOD := Color("#1f9e89")
+const LINE := Color("#d9e2ec")
 
 static var _theme: Theme
 static var _font: SystemFont
+static var _font_black: SystemFont
 
 
 static func font() -> SystemFont:
@@ -24,6 +29,14 @@ static func font() -> SystemFont:
 		_font.font_names = PackedStringArray(["Nunito", "Poppins", "Segoe UI", "Roboto", "Arial"])
 		_font.font_weight = 700
 	return _font
+
+
+static func font_black() -> SystemFont:
+	if _font_black == null:
+		_font_black = SystemFont.new()
+		_font_black.font_names = PackedStringArray(["Nunito", "Poppins", "Segoe UI Black", "Segoe UI", "Roboto", "Arial"])
+		_font_black.font_weight = 900
+	return _font_black
 
 
 static func theme() -> Theme:
@@ -35,40 +48,39 @@ static func theme() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", card())
 	t.set_stylebox("panel", "Panel", card())
 	for type in ["Button", "OptionButton"]:
-		t.set_stylebox("normal", type, box(PANEL, 26, 18, 10, ACCENT.lightened(0.55), 2, true))
-		t.set_stylebox("hover", type, box(Color("#f3f0ff"), 26, 18, 10, ACCENT, 2, true))
-		t.set_stylebox("pressed", type, box(Color("#e4ddff"), 26, 18, 10, ACCENT, 2))
+		t.set_stylebox("normal", type, box(PANEL, 26, 18, 10, LINE, 2, true))
+		t.set_stylebox("hover", type, box(Color("#f6f9fc"), 26, 18, 10, ACCENT, 2, true))
+		t.set_stylebox("pressed", type, box(Color("#fff3df"), 26, 18, 10, ACCENT, 2))
 		t.set_stylebox("disabled", type, box(SOFT, 26, 18, 10))
 		t.set_stylebox("focus", type, StyleBoxEmpty.new())
-		t.set_color("font_color", type, ACCENT.darkened(0.2))
-		t.set_color("font_hover_color", type, ACCENT.darkened(0.3))
-		t.set_color("font_pressed_color", type, ACCENT.darkened(0.3))
-		t.set_color("font_disabled_color", type, Color("#b2bec3"))
+		for c in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+			t.set_color(c, type, NAVY)
+		t.set_color("font_disabled_color", type, Color("#a9b4c2"))
 	for type in ["CheckBox", "CheckButton"]:
-		t.set_stylebox("normal", type, box(SOFT, 14, 12, 8))
-		t.set_stylebox("hover", type, box(Color("#e9e6ff"), 14, 12, 8))
-		t.set_stylebox("pressed", type, box(SOFT, 14, 12, 8))
-		t.set_stylebox("hover_pressed", type, box(Color("#e9e6ff"), 14, 12, 8))
+		t.set_stylebox("normal", type, box(SOFT, 16, 14, 10))
+		t.set_stylebox("hover", type, box(Color("#e3ebf3"), 16, 14, 10))
+		t.set_stylebox("pressed", type, box(SOFT, 16, 14, 10))
+		t.set_stylebox("hover_pressed", type, box(Color("#e3ebf3"), 16, 14, 10))
 		t.set_stylebox("focus", type, StyleBoxEmpty.new())
 		for c in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
 			t.set_color(c, type, TEXT)
 	t.set_color("font_color", "Label", TEXT)
-	t.set_stylebox("normal", "LineEdit", box(SOFT, 14, 14, 10))
+	t.set_stylebox("normal", "LineEdit", box(PANEL, 14, 14, 10, LINE, 2))
 	t.set_stylebox("focus", "LineEdit", box(PANEL, 14, 14, 10, ACCENT, 2))
 	t.set_color("font_color", "LineEdit", TEXT)
-	t.set_color("font_placeholder_color", "LineEdit", Color("#b2bec3"))
+	t.set_color("font_placeholder_color", "LineEdit", Color("#a9b4c2"))
 	t.set_color("caret_color", "LineEdit", ACCENT)
 	t.set_stylebox("normal", "RichTextLabel", StyleBoxEmpty.new())
 	t.set_color("default_color", "RichTextLabel", TEXT)
 	t.set_font("normal_font", "RichTextLabel", font())
 	t.set_stylebox("slider", "HSlider", box(SOFT, 6, 0, 4))
-	t.set_stylebox("grabber_area", "HSlider", box(ACCENT_2, 6, 0, 4))
-	t.set_stylebox("grabber_area_highlight", "HSlider", box(ACCENT_2, 6, 0, 4))
+	t.set_stylebox("grabber_area", "HSlider", box(ACCENT, 6, 0, 4))
+	t.set_stylebox("grabber_area_highlight", "HSlider", box(ACCENT, 6, 0, 4))
 	t.set_stylebox("panel", "PopupMenu", card())
 	t.set_color("font_color", "PopupMenu", TEXT)
-	t.set_color("font_hover_color", "PopupMenu", ACCENT)
-	t.set_stylebox("hover", "PopupMenu", box(Color("#f3f0ff"), 10, 8, 6))
-	t.set_stylebox("panel", "TooltipPanel", box(TEXT, 10, 10, 6))
+	t.set_color("font_hover_color", "PopupMenu", NAVY)
+	t.set_stylebox("hover", "PopupMenu", box(Color("#fff3df"), 10, 8, 6))
+	t.set_stylebox("panel", "TooltipPanel", box(NAVY, 10, 10, 6))
 	t.set_color("font_color", "TooltipLabel", Color.WHITE)
 	_theme = t
 	return t
@@ -87,23 +99,24 @@ static func box(color: Color, radius: int = 16, mx: int = 14, my: int = 12, bord
 		sb.set_border_width_all(border_w)
 		sb.border_color = border
 	if shadow:
-		sb.shadow_color = Color(0.17, 0.12, 0.35, 0.18)
-		sb.shadow_size = 8
-		sb.shadow_offset = Vector2(0, 4)
+		sb.shadow_color = Color(0.04, 0.09, 0.2, 0.22)
+		sb.shadow_size = 10
+		sb.shadow_offset = Vector2(0, 5)
 	return sb
 
 
 ## Tarjeta blanca con sombra suave.
 static func card(color: Color = PANEL, border: Color = Color(0, 0, 0, 0)) -> StyleBoxFlat:
-	return box(color, 24, 20, 18, border, 3, true)
+	return box(color, 24, 22, 20, border, 3, true)
 
 
-static func label(text: String, font_size: int = 18, color: Color = TEXT) -> Label:
+## Etiqueta de una línea. `wrap` = true para párrafos dentro de un contenedor con ancho.
+static func label(text: String, font_size: int = 18, color: Color = TEXT, wrap: bool = false) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", color)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wrap else TextServer.AUTOWRAP_OFF
 	return l
 
 
@@ -114,25 +127,50 @@ static func button(text: String, cb: Callable, accent: bool = false, color: Colo
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 54)
 	if accent:
+		var fg := NAVY if color.get_luminance() > 0.55 else Color.WHITE
 		b.add_theme_stylebox_override("normal", box(color, 26, 22, 10, Color(0, 0, 0, 0), 0, true))
 		b.add_theme_stylebox_override("hover", box(color.lightened(0.12), 26, 22, 10, Color(0, 0, 0, 0), 0, true))
 		b.add_theme_stylebox_override("pressed", box(color.darkened(0.12), 26, 22, 10))
 		for c in ["font_color", "font_hover_color", "font_pressed_color"]:
-			b.add_theme_color_override(c, Color.WHITE)
+			b.add_theme_color_override(c, fg)
+	make_lively(b)
 	b.pressed.connect(func():
 		Sfx.play("click")
-		_bounce(b)
 		cb.call())
 	return b
 
 
-static func _bounce(c: Control) -> void:
+## Hace que un control reaccione: crece al pasar el cursor y rebota al presionar.
+static func make_lively(c: Control) -> void:
+	c.mouse_entered.connect(func(): _scale_to(c, 1.04, 0.12))
+	c.mouse_exited.connect(func(): _scale_to(c, 1.0, 0.15))
+	if c is BaseButton:
+		(c as BaseButton).button_down.connect(func(): _scale_to(c, 0.93, 0.06))
+		(c as BaseButton).button_up.connect(func():
+			if c.is_inside_tree():
+				c.pivot_offset = c.size / 2.0
+				c.create_tween().tween_property(c, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT))
+
+
+static func _scale_to(c: Control, s: float, t: float) -> void:
 	if not c.is_inside_tree():
 		return
 	c.pivot_offset = c.size / 2.0
-	var tw := c.create_tween()
-	tw.tween_property(c, "scale", Vector2(0.94, 0.94), 0.06)
-	tw.tween_property(c, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK)
+	c.create_tween().tween_property(c, "scale", Vector2(s, s), t).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## Entrada escalonada: los hijos aparecen subiendo y haciéndose visibles uno tras otro.
+static func animate_in(container: Control, step: float = 0.045) -> void:
+	var k := 0
+	for child in container.get_children():
+		if not child is Control:
+			continue
+		var c: Control = child
+		c.modulate.a = 0.0
+		var tw := c.create_tween()
+		tw.tween_interval(k * step)
+		tw.tween_property(c, "modulate:a", 1.0, 0.25)
+		k += 1
 
 
 static func vbox(sep: int = 12) -> VBoxContainer:
@@ -157,7 +195,7 @@ static func panel(child: Control, color: Color = PANEL, border: Color = Color(0,
 ## Centra un panel sobre un fondo velado que bloquea clics; entra con un pequeño rebote.
 static func modal(content: Control, parent: Control) -> Control:
 	var dim := ColorRect.new()
-	dim.color = Color(0.18, 0.12, 0.35, 0.45)
+	dim.color = Color(0.03, 0.08, 0.17, 0.55)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	var center := CenterContainer.new()
@@ -181,6 +219,15 @@ static func swatch(color: Color, size: Vector2 = Vector2(18, 18)) -> Panel:
 	return p
 
 
+## Etiqueta tipo "chip" con fondo de color (propiedades en negociaciones, etc.).
+static func chip(text: String, color: Color) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", box(color, 14, 12, 5))
+	var l := label(text, 15, NAVY if color.get_luminance() > 0.55 else Color.WHITE)
+	p.add_child(l)
+	return p
+
+
 static func token_icon(token: String, color: Color, size: float = 36.0) -> Control:
 	var c := TokenIcon.new()
 	c.token = token
@@ -189,12 +236,12 @@ static func token_icon(token: String, color: Color, size: float = 36.0) -> Contr
 	return c
 
 
-## Fondo degradado vivo para el menú y pantallas completas.
+## Fondo degradado (azul marino a verde azulado) para el menú.
 static func gradient_bg() -> TextureRect:
 	var g := Gradient.new()
-	g.set_color(0, Color("#6c5ce7"))
-	g.set_color(1, Color("#fd79a8"))
-	g.add_point(0.55, Color("#a29bfe"))
+	g.set_color(0, Color("#0b1d3a"))
+	g.set_color(1, Color("#1b6b73"))
+	g.add_point(0.55, Color("#12425a"))
 	var tex := GradientTexture2D.new()
 	tex.gradient = g
 	tex.fill_from = Vector2(0, 0)

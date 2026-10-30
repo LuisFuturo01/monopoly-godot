@@ -1,0 +1,30 @@
+# Créditos de fotografías
+
+Fotos de Wikimedia Commons con licencias libres, usadas en los carteles del tablero.
+
+| Casilla | Archivo | Autor | Licencia |
+|---|---|---|---|
+| 1 | [File:FrutasVillaFatima2.jpg](https://commons.wikimedia.org/wiki/File:FrutasVillaFatima2.jpg) | Rodrigo Garcia | CC BY-SA 4.0 |
+| 4 | [File:Línea Roja de Mi Teleférico en La Paz, Bolivia.jpg](https://commons.wikimedia.org/wiki/File:L%C3%ADnea_Roja_de_Mi_Telef%C3%A9rico_en_La_Paz,_Bolivia.jpg) | EEJCC | CC BY-SA 4.0 |
+| 6 | [File:Puesto de pescado del lago Titi Caca en el mercado de Chasquipampa La Paz y.jpg](https://commons.wikimedia.org/wiki/File:Puesto_de_pescado_del_lago_Titi_Caca_en_el_mercado_de_Chasquipampa_La_Paz_y.jpg) | MaiMariela | CC BY-SA 4.0 |
+| 7 | [File:Vista aérea de Obrajes, La Paz.jpg](https://commons.wikimedia.org/wiki/File:Vista_a%C3%A9rea_de_Obrajes,_La_Paz.jpg) | EEJCC | CC BY-SA 4.0 |
+| 9 | [File:Plaza Litoral, Irpavi. La Paz - Bolivia.jpg](https://commons.wikimedia.org/wiki/File:Plaza_Litoral,_Irpavi._La_Paz_-_Bolivia.jpg) | Rodrigo Alberto Rivadeneyra Miranda | CC BY-SA 4.0 |
+| 11 | [File:Miraflores, La Paz.jpg](https://commons.wikimedia.org/wiki/File:Miraflores,_La_Paz.jpg) | Parallelepiped09 | CC BY-SA 4.0 |
+| 13 | [File:Vista de Sopocachi La Paz.jpg](https://commons.wikimedia.org/wiki/File:Vista_de_Sopocachi_La_Paz.jpg) | EEJCC | CC BY-SA 4.0 |
+| 14 | [File:Plaza de San Pedro vista de la cárcel.jpg](https://commons.wikimedia.org/wiki/File:Plaza_de_San_Pedro_vista_de_la_c%C3%A1rcel.jpg) | Olga Lidia Paredes Alcoreza | CC BY-SA 4.0 |
+| 15 | [File:Teleferica La Paz.jpg](https://commons.wikimedia.org/wiki/File:Teleferica_La_Paz.jpg) | Marco Ebreo | CC BY-SA 4.0 |
+| 17 | [File:Vista del barrio de Calacoto, La Paz, Bolivia.jpg](https://commons.wikimedia.org/wiki/File:Vista_del_barrio_de_Calacoto,_La_Paz,_Bolivia.jpg) | EEJCC | CC BY-SA 4.0 |
+| 18 | [File:Achumani, La Paz, Bolivia.jpg](https://commons.wikimedia.org/wiki/File:Achumani,_La_Paz,_Bolivia.jpg) | Parallelepiped09 | CC BY-SA 4.0 |
+| 38 | [File:Calacoto La Paz, Bolivia.jpg](https://commons.wikimedia.org/wiki/File:Calacoto_La_Paz,_Bolivia.jpg) | Russland345 | CC BY-SA 4.0 |
+| 39 | [File:Illimani nevado.jpg](https://commons.wikimedia.org/wiki/File:Illimani_nevado.jpg) | Gogh'snight | CC BY-SA 4.0 |
+| 19 | [File:Mercado Los Pinos, La Paz-Bolivia.jpg](https://commons.wikimedia.org/wiki/File:Mercado_Los_Pinos,_La_Paz-Bolivia.jpg) | Yurizzama | CC BY 4.0 |
+| 21 | [File:El Prado, Plaza del Estudiante, La Paz.jpg](https://commons.wikimedia.org/wiki/File:El_Prado,_Plaza_del_Estudiante,_La_Paz.jpg) | Senorhorst Jahnsen | CC BY 2.0 |
+| 24 | [File:Musa de la arquitectura, plaza Murillo, La Paz - Bolivia.jpg](https://commons.wikimedia.org/wiki/File:Musa_de_la_arquitectura,_plaza_Murillo,_La_Paz_-_Bolivia.jpg) | Issagahan | CC BY-SA 4.0 |
+| 25 | [File:Estación Irpawi de la línea verde de Mi Teleférico.jpg](https://commons.wikimedia.org/wiki/File:Estaci%C3%B3n_Irpawi_de_la_l%C3%ADnea_verde_de_Mi_Telef%C3%A9rico.jpg) | EEJCC | CC0 |
+| 26 | [File:Plaza del Tinku, ciudad Satelite (El Alto).jpg](https://commons.wikimedia.org/wiki/File:Plaza_del_Tinku,_ciudad_Satelite_(El_Alto).jpg) | Estrellaef | CC BY-SA 4.0 |
+| 28 | [File:Amanecer en el lago Titicaca, Puno, Perú, 2015-08-01, DD 01.JPG](https://commons.wikimedia.org/wiki/File:Amanecer_en_el_lago_Titicaca,_Puno,_Per%C3%BA,_2015-08-01,_DD_01.JPG) | Diego Delso | CC BY-SA 4.0 |
+| 29 | [File:Feria de la ceja de El Alto.jpg](https://commons.wikimedia.org/wiki/File:Feria_de_la_ceja_de_El_Alto.jpg) | Chavezrodri1 | CC0 |
+| 31 | [File:Piles of Salt Salar de Uyuni Bolivia Luca Galuzzi 2006 a.jpg](https://commons.wikimedia.org/wiki/File:Piles_of_Salt_Salar_de_Uyuni_Bolivia_Luca_Galuzzi_2006_a.jpg) | Luca Galuzzi (Lucag), edit by Trialsanderrors | CC BY-SA 2.5 |
+| 32 | [File:Tiwanaku-Puerta del sol.jpg](https://commons.wikimedia.org/wiki/File:Tiwanaku-Puerta_del_sol.jpg) | Fallbeth | CC BY-SA 4.0 |
+| 34 | [File:Copacabana, Bolivia.jpg](https://commons.wikimedia.org/wiki/File:Copacabana,_Bolivia.jpg) | Christopher Crouzet | CC BY-SA 3.0 |
+| 35 | [File:Plaza Libertad en la Estación Teleférico Línea Azul ciudad de El Alto , Monumento a Túpac Amaru.jpg](https://commons.wikimedia.org/wiki/File:Plaza_Libertad_en_la_Estaci%C3%B3n_Telef%C3%A9rico_L%C3%ADnea_Azul_ciudad_de_El_Alto_,_Monumento_a_T%C3%BApac_Amaru.jpg) | Norkiña | CC BY-SA 4.0 |
