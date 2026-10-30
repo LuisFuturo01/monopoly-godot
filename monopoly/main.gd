@@ -67,7 +67,6 @@ func _start_demo() -> void:
 	var rules := RulesConfig.classic()
 	rules.speed_die = true
 	_start_game("local", seats, rules)
-	_controller.player_events.speed = float(_args.get("speed", "1"))
 
 
 func _start_game(kind: String, seats: Array, rules: RulesConfig, snapshot: Dictionary = {}) -> void:
@@ -111,7 +110,8 @@ func _start_game(kind: String, seats: Array, rules: RulesConfig, snapshot: Dicti
 	_game.add_child(audio)
 	audio.bind(_controller)
 	Net.session_ended.connect(_on_session_ended)
-	_apply_view()
+	Profile.settings_changed.connect(_apply_settings)
+	_apply_settings()
 
 
 func _on_session_ended(reason: String) -> void:
@@ -121,7 +121,14 @@ func _on_session_ended(reason: String) -> void:
 
 func _toggle_view() -> void:
 	Profile.view_mode = "2d" if Profile.view_mode == "3d" else "3d"
-	Profile.save_profile()
+	Profile.apply_settings()
+
+
+func _apply_settings() -> void:
+	if _controller == null:
+		return
+	_controller.player_events.speed = float(_args.get("speed", Profile.anim_speed))
+	_view3d.cinematic = Profile.cinematic
 	_apply_view()
 
 
@@ -155,6 +162,22 @@ func _hud_test(panel: String) -> void:
 			_hud._show_trade_composer()
 		"space":
 			_hud._show_space(6)
+		"buy":
+			e.player(0)["pos"] = 11
+			_controller.player_events.sync_from(e)
+			e.s["phase"] = GameEngine.AWAIT_BUY
+			e.s["pending_buy"] = 11
+		"build":
+			e.player(0)["cash"] = 3000
+			e.s["houses"][6] = 0
+			e.s["houses"][7] = 0
+			e.s["houses"][9] = 0
+			e.s["houses_left"] = 32
+			_controller.state_changed.emit()
+			await get_tree().create_timer(1.0).timeout
+			for i in [6, 7, 9, 6, 7, 9]:
+				_controller.submit({"type": "build", "player": 0, "space": i})
+				await get_tree().create_timer(0.15).timeout
 		"auction":
 			e.s["current"] = 1
 			e.s["phase"] = GameEngine.AUCTION
@@ -244,6 +267,8 @@ func _state_hash() -> int:
 func _end_game() -> void:
 	if Net.session_ended.is_connected(_on_session_ended):
 		Net.session_ended.disconnect(_on_session_ended)
+	if Profile.settings_changed.is_connected(_apply_settings):
+		Profile.settings_changed.disconnect(_apply_settings)
 	if _controller:
 		_controller.shutdown()
 	if _game:

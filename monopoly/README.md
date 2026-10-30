@@ -10,8 +10,9 @@ contra la IA, pasar y jugar, y red local Wi-Fi / Bluetooth sin servidores.
 La versión anterior (ahora en `legacy/`, ignorada por Godot) mezclaba en un solo
 `GameManager.gd` de 1460 líneas la cámara, la UI, las animaciones y las reglas, y
 los datos de casilla guardaban referencias a nodos visuales. Eso impide red
-autoritativa, IA y una segunda vista, así que se rehízo desde cero. Solo se
-reutiliza el asset `ciudad/city.glb` (ciudad en miniatura del centro 3D).
+autoritativa, IA y una segunda vista, así que se rehízo desde cero. La ciudad del
+centro es procedural (calles, barrios, parque, nevados, teleférico y autos animados);
+no se usan modelos descargados.
 
 ```
 core/       Reglas puras (RefCounted, sin nodos). Testeables en headless.
@@ -36,6 +37,11 @@ Flujo: la UI/IA/red producen **comandos** → `GameEngine.apply()` valida y muta
 estado → devuelve **eventos** → `EventPlayer` los reproduce en secuencia → vistas
 2D/3D, HUD y audio reaccionan. El motor nunca conoce la presentación.
 
+El motor aplica cada comando al instante, pero la pantalla no debe adelantarse:
+`EventPlayer.shown_pos` / `shown_cash` avanzan con cada evento reproducido, y las
+vistas y el HUD dibujan esos valores. Así la ficha recorre las casillas desde su origen
+y el dinero cambia cuando la animación llega, no antes.
+
 ### Fases de la FSM
 
 `pre_roll → (resolving) → await_buy | auction | debt → post_roll → pre_roll (siguiente)`
@@ -52,9 +58,12 @@ tirar/terminar hasta que el destinatario responde.
 - Intercambio de dinero, propiedades y salvoconductos antes o después de tirar.
 - Construcción pareja, suministro limitado (32 casas / 12 hoteles), hotel = 4 casas
   (3 en modo rápido), venta pareja a mitad de precio.
-- Hipoteca al 50 %, levantar al 55 %. Patrimonio neto y valor de liquidación.
+- Hipoteca al 50 %, levantar al 55 %. Quien recibe una propiedad hipotecada (por
+  intercambio o quiebra) paga al banco el 10 % de interés. Patrimonio neto y valor
+  de liquidación.
 - Deudas encadenadas: si no alcanza el efectivo, fase `debt` para hipotecar/vender;
-  quiebra transfiere todo al acreedor o devuelve las propiedades al banco.
+  quiebra transfiere todo al acreedor; si el acreedor es el banco, éste subasta una
+  a una las propiedades del jugador quebrado.
 - Mazos barajados con: dinero, movimientos, teleférico/servicio más cercano,
   reparaciones por casa/hotel, pagar/cobrar a cada jugador, salvoconducto.
 - Modo rápido: fin en la primera quiebra (gana el mayor patrimonio), hotel con 3 casas,
@@ -95,7 +104,10 @@ $GODOT --headless --path . -- --net-join=127.0.0.1 --drop=8     # cliente que se
 ```
 
 Otros argumentos de depuración: `--shot=<png> --time=<s>` (captura y salir),
-`--page=profile|setup|wifi`, `--hud-test=manager|trade|auction|space`, `--speed=<x>`.
+`--page=profile|setup|wifi`, `--hud-test=manager|trade|auction|space|buy|build`, `--speed=<x>`.
+
+Opciones (menú y partida): volumen de música y efectos, vista 2D/3D, velocidad de
+animación, cámara que sigue a la ficha y registro de jugadas.
 
 ## Limitaciones conocidas
 
@@ -103,7 +115,5 @@ Otros argumentos de depuración: `--shot=<png> --time=<s>` (captura y salir),
   expone RFCOMM a apps sin MFi, así que allí solo hay Wi-Fi.
 - Descubrimiento solo por broadcast UDP (sin mDNS). Si el anfitrión sale, la partida
   termina (no hay migración de anfitrión).
-- En quiebra contra el banco las propiedades vuelven libres (no se subastan) y las
-  propiedades hipotecadas se transfieren sin el 10 % de interés.
 - Las vistas aún no tienen modelos importados para fichas ni edificios: todo es
   procedural (primitivas 3D y glifos 2D).

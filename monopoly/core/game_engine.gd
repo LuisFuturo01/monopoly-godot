@@ -106,6 +106,8 @@ func new_game(seats: Array, p_seed: int = 0) -> void:
 		"pending_move": 0,
 		"trade": {},
 		"trade_proposals": 0,
+		"auction_queue": [],
+		"resume_phase": "",
 		"round": 1,
 		"turns": 0,
 		"winner": -1,
@@ -570,7 +572,7 @@ func _send_to_jail(pid: int) -> void:
 		s["doubles"] = 0
 		s["extra_roll"] = false
 		s["bolt_pending"] = false
-	_ev("jailed", {"player": pid})
+	_ev("jailed", {"player": pid, "space": board.jail_index})
 
 
 ## Se llama cuando termina de resolverse una caída (o un paso bloqueante).
@@ -581,6 +583,16 @@ func _resolve_done() -> void:
 		return
 	var cont: String = s["continuation"]
 	s["continuation"] = ""
+	if cont == "resume":
+		# Vuelve a la fase previa (p. ej. tras pagar el interés de un intercambio antes de tirar).
+		s["phase"] = s["resume_phase"]
+		return
+	# Reglas oficiales: el banco subasta las propiedades de quien quebró ante él.
+	var queue: Array = s.get("auction_queue", [])
+	if not queue.is_empty():
+		s["continuation"] = cont
+		_start_auction(int(queue.pop_front()), -1)
+		return
 	var cur := current()
 	var p := player(cur)
 	if cont == "jail_move" and not p["bankrupt"]:
@@ -751,11 +763,13 @@ func _cmd_decline(pid: int) -> String:
 	return ""
 
 
+## decliner = -1: subasta del banco abierta a todos, empezando tras el jugador actual.
 func _start_auction(i: int, decliner: int) -> void:
 	var bidders := []
 	var n: int = s["players"].size()
+	var start := decliner if decliner >= 0 else current()
 	for k in range(1, n + 1):
-		var pid := (decliner + k) % n
+		var pid := (start + k) % n
 		if player(pid)["bankrupt"]:
 			continue
 		if pid == decliner and not rules.auction_includes_decliner:
@@ -965,11 +979,8 @@ func _cmd_bankrupt(pid: int) -> String:
 	_bankrupt(pid, creditor)
 	if is_over():
 		return ""
-	if phase() == DEBT or phase() == RESOLVING:
-		s["phase"] = RESOLVING
-		_resolve_done()
-	elif pid == current():
-		_next_turn()
+	s["phase"] = RESOLVING
+	_resolve_done()
 	return ""
 
 
@@ -993,11 +1004,13 @@ func _bankrupt(pid: int, creditor: int) -> void:
 		_ev("money", {"player": creditor, "delta": p["cash"], "reason": "Bancarrota de %s" % p["name"]})
 		for i in properties_of(pid):
 			s["owner"][i] = creditor
+			_charge_mortgage_interest(creditor, i)
 		c["jail_cards"].append_array(p["jail_cards"])
 	else:
 		for i in properties_of(pid):
 			s["owner"][i] = -1
 			s["mortgaged"][i] = false
+			s["auction_queue"].append(i)
 		for deck_name in p["jail_cards"]:
 			_return_jail_card(deck_name)
 	p["jail_cards"] = []
@@ -1025,6 +1038,7 @@ func _game_over(reason: String) -> void:
 			best_worth = w
 			best = pid
 	s["winner"] = best
+	s["auction_queue"] = []
 	s["phase"] = GAME_OVER
 	var ranking := []
 	for p in s["players"]:
@@ -1139,7 +1153,18 @@ func _cmd_trade_accept(pid: int) -> String:
 	_swap(b, a, t["get"])
 	s["trade"] = {}
 	_ev("trade_resolved", {"from": a, "to": b, "result": "accepted"})
+	if not s["debts"].is_empty():
+		s["resume_phase"] = phase()
+		s["continuation"] = "resume"
+		s["phase"] = RESOLVING
+		_resolve_done()
 	return ""
+
+
+## Regla oficial: quien recibe una propiedad hipotecada paga al banco el 10 % de la hipoteca.
+func _charge_mortgage_interest(receiver: int, i: int) -> void:
+	if is_mortgaged(i):
+		_charge(receiver, BANK, int(ceil(board.mortgage_value(i) * 0.1)), "Interés de hipoteca")
 
 
 func _swap(src: int, dst: int, o: Dictionary) -> void:
@@ -1147,6 +1172,7 @@ func _swap(src: int, dst: int, o: Dictionary) -> void:
 		_transfer(src, dst, o["cash"], "Intercambio")
 	for i in o["props"]:
 		s["owner"][i] = dst
+		_charge_mortgage_interest(dst, int(i))
 	for k in o["cards"]:
 		player(dst)["jail_cards"].append(player(src)["jail_cards"].pop_back())
 

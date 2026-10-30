@@ -24,6 +24,8 @@ var _card_timer: SceneTreeTimer
 var _handoff: Control
 var _toast: Label
 var _view_btn: Button
+var _player_cards: Dictionary = {}   # pid -> PanelContainer
+var _floats: Dictionary = {}         # pid -> avisos de dinero visibles (para apilarlos)
 var _last_local_actor := -1
 var _game_over_shown := false
 
@@ -91,19 +93,22 @@ func _build() -> void:
 	scroll.add_child(_players_bar)
 	_view_btn = UiKit.button("2D", func(): view_toggle_requested.emit())
 	top_row.add_child(_view_btn)
-	top_row.add_child(UiKit.button("Registro", func(): _log_panel.visible = not _log_panel.visible))
-	top_row.add_child(UiKit.button("Ajustes", _show_settings))
+	top_row.add_child(UiKit.button("Registro", func():
+		Profile.show_log = not Profile.show_log
+		Profile.apply_settings()))
+	top_row.add_child(UiKit.button("Opciones", _show_settings))
 	top_row.add_child(UiKit.button("Salir", _confirm_exit))
 
 	# Registro
 	_log_panel = PanelContainer.new()
-	_log_panel.add_theme_stylebox_override("panel", UiKit.box(Color(0.06, 0.08, 0.1, 0.85), 12, 12, 10))
+	_log_panel.add_theme_stylebox_override("panel", UiKit.box(Color(1, 1, 1, 0.88), 20, 14, 12, Color(0, 0, 0, 0), 0, true))
 	_log_panel.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
 	_log_panel.offset_left = -320
 	_log_panel.offset_right = -10
 	_log_panel.offset_top = 92
 	_log_panel.offset_bottom = -150
-	_log_panel.visible = get_viewport_rect().size.x > 1100
+	_log_panel.visible = Profile.show_log
+	Profile.settings_changed.connect(func(): _log_panel.visible = Profile.show_log)
 	add_child(_log_panel)
 	_log = RichTextLabel.new()
 	_log.bbcode_enabled = true
@@ -114,7 +119,7 @@ func _build() -> void:
 
 	# Barra inferior de acciones
 	_bottom = PanelContainer.new()
-	_bottom.add_theme_stylebox_override("panel", UiKit.box(Color(0.07, 0.09, 0.11, 0.92), 16, 16, 12))
+	_bottom.add_theme_stylebox_override("panel", UiKit.card())
 	_bottom.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_bottom.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -134,7 +139,7 @@ func _build() -> void:
 
 	# Subasta (no modal)
 	_auction_panel = PanelContainer.new()
-	_auction_panel.add_theme_stylebox_override("panel", UiKit.box(UiKit.PANEL, 16, 18, 14, UiKit.ACCENT))
+	_auction_panel.add_theme_stylebox_override("panel", UiKit.card(UiKit.PANEL, UiKit.GOLD))
 	_auction_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_auction_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_auction_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -143,7 +148,7 @@ func _build() -> void:
 
 	# Intercambio entrante / pendiente
 	_trade_panel = PanelContainer.new()
-	_trade_panel.add_theme_stylebox_override("panel", UiKit.box(UiKit.PANEL, 16, 18, 14, UiKit.ACCENT))
+	_trade_panel.add_theme_stylebox_override("panel", UiKit.card(UiKit.PANEL, UiKit.ACCENT_2))
 	_trade_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_trade_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_trade_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -171,7 +176,7 @@ func _build() -> void:
 	_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_toast.offset_top = 86
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_toast.add_theme_stylebox_override("normal", UiKit.box(Color(0.6, 0.15, 0.12, 0.95), 10, 14, 8))
+	_toast.add_theme_stylebox_override("normal", UiKit.box(UiKit.DANGER, 20, 18, 10, Color(0, 0, 0, 0), 0, true))
 	_toast.visible = false
 	add_child(_toast)
 
@@ -207,6 +212,12 @@ func _refresh() -> void:
 				_show_manager()
 			"space":
 				_show_space(_modal_arg)
+	var local := controller.local_actor()
+	if e().phase() == GameEngine.AWAIT_BUY and local >= 0 and not controller.is_busy() and _modal_kind != "buy" and e().s["trade"].is_empty():
+		_modal_kind = "buy_pending"
+		_show_space(int(e().s["pending_buy"]))
+	elif _modal_kind == "buy" and (e().phase() != GameEngine.AWAIT_BUY or local < 0):
+		_close_modal()
 	if e().is_over() and not _game_over_shown and not controller.is_busy():
 		_show_game_over()
 
@@ -214,13 +225,19 @@ func _refresh() -> void:
 func _refresh_players() -> void:
 	for child in _players_bar.get_children():
 		child.queue_free()
+	_player_cards.clear()
+	var shown: Dictionary = controller.player_events.shown_cash
 	for p in e().players():
 		var pid := int(p["id"])
 		var cur := pid == e().current() and not e().is_over()
 		var card := PanelContainer.new()
-		var border := Color.html(p["color"]) if cur else Color(0, 0, 0, 0)
-		card.add_theme_stylebox_override("panel", UiKit.box(Color(0.1, 0.12, 0.15, 0.92), 12, 10, 6, border))
+		var pcol := Color.html(p["color"])
+		var sb := UiKit.box(Color("#fff7d6") if cur else Color.WHITE, 20, 12, 8, pcol if cur else Color(0, 0, 0, 0), 3, true)
+		sb.border_width_bottom = 6
+		sb.border_color = pcol
+		card.add_theme_stylebox_override("panel", sb)
 		card.modulate.a = 0.45 if p["bankrupt"] else 1.0
+		_player_cards[pid] = card
 		var row := UiKit.hbox(8)
 		card.add_child(row)
 		row.add_child(UiKit.token_icon(p["token"], Color.html(p["color"]), 40))
@@ -240,7 +257,7 @@ func _refresh_players() -> void:
 			tags.append("desconectado (IA)")
 		if not p["jail_cards"].is_empty():
 			tags.append("salvoconducto x%d" % p["jail_cards"].size())
-		var cash_l := UiKit.label("$%d" % int(p["cash"]), 17, UiKit.ACCENT)
+		var cash_l := UiKit.label("$%d" % int(shown.get(pid, p["cash"])), 20, UiKit.GOOD.darkened(0.1))
 		cash_l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		col.add_child(cash_l)
 		if not tags.is_empty():
@@ -513,7 +530,7 @@ func _show_space(i: int) -> void:
 	var v := UiKit.vbox(6)
 	v.custom_minimum_size = Vector2(340, 0)
 	var head := PanelContainer.new()
-	head.add_theme_stylebox_override("panel", UiKit.box(b.space_color(i) if sp["type"] == "street" else Color(0.25, 0.28, 0.32), 10, 12, 10))
+	head.add_theme_stylebox_override("panel", UiKit.box(b.space_color(i) if sp["type"] == "street" else UiKit.ACCENT, 16, 12, 14))
 	var hl := UiKit.label(String(sp["name"]).to_upper(), 22, Color.WHITE)
 	hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.add_child(hl)
@@ -556,6 +573,25 @@ func _show_space(i: int) -> void:
 			row.add_theme_constant_override("h_separation", 6)
 			v.add_child(row)
 			_manage_buttons(row, me, i)
+	if _modal_kind == "buy_pending":
+		var me2 := controller.local_actor()
+		var row2 := UiKit.hbox(10)
+		var buy := UiKit.button("Comprar $%d" % b.price(i), func():
+			_close_modal()
+			_submit({"type": "buy", "player": me2}), true, UiKit.GOOD)
+		buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		buy.disabled = int(en.player(me2)["cash"]) < b.price(i)
+		var auc := UiKit.button("Subastar", func():
+			_close_modal()
+			_submit({"type": "decline", "player": me2}))
+		auc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row2.add_child(buy)
+		row2.add_child(auc)
+		v.add_child(row2)
+		if buy.disabled:
+			v.add_child(UiKit.label("No te alcanza: hipoteca algo desde «Mis propiedades» o súbastala.", 14, UiKit.DANGER))
+		_open_modal(UiKit.panel(v), "buy", i)
+		return
 	v.add_child(UiKit.button("Cerrar", _close_modal))
 	_open_modal(UiKit.panel(v), "space", i)
 
@@ -565,7 +601,9 @@ func _row(parent: Control, a: String, b: String) -> void:
 	var la := UiKit.label(a, 15, UiKit.MUTED)
 	la.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(la)
-	h.add_child(UiKit.label(b, 15))
+	var lb := UiKit.label(b, 16)
+	lb.autowrap_mode = TextServer.AUTOWRAP_OFF
+	h.add_child(lb)
 	parent.add_child(h)
 
 
@@ -637,7 +675,7 @@ func _open_modal(content: Control, kind: String, arg: int) -> void:
 	_modal_kind = kind
 	_modal_arg = arg
 	_modal.gui_input.connect(func(ev):
-		if ev is InputEventMouseButton and ev.pressed and kind != "trade":
+		if ev is InputEventMouseButton and ev.pressed and not kind in ["trade", "buy"]:
 			_close_modal())
 
 
@@ -667,29 +705,7 @@ func _confirm_exit() -> void:
 
 
 func _show_settings() -> void:
-	var v := UiKit.vbox(10)
-	v.custom_minimum_size = Vector2(380, 0)
-	v.add_child(UiKit.label("Ajustes", 22, UiKit.ACCENT))
-	for spec in [["Música", "music_volume"], ["Efectos", "sfx_volume"]]:
-		v.add_child(UiKit.label(spec[0], 16))
-		var s := HSlider.new()
-		s.min_value = 0.0
-		s.max_value = 1.0
-		s.step = 0.05
-		s.value = Profile.get(spec[1])
-		s.value_changed.connect(func(val):
-			Profile.set(spec[1], val)
-			Sfx.apply_volumes()
-			Profile.save_profile())
-		v.add_child(s)
-	var cine := CheckBox.new()
-	cine.text = "Cámara cinemática (3D)"
-	var view3d := get_tree().get_first_node_in_group("board_view_3d") as BoardView3D
-	cine.button_pressed = view3d.cinematic if view3d else true
-	cine.toggled.connect(func(on): if view3d: view3d.cinematic = on)
-	v.add_child(cine)
-	v.add_child(UiKit.button("Cerrar", _close_modal))
-	_open_modal(UiKit.panel(v), "settings", -1)
+	_open_modal(OptionsPanel.build(_close_modal), "settings", -1)
 
 
 func _show_game_over() -> void:
@@ -727,6 +743,9 @@ func _show_game_over() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_event(ev: Dictionary) -> void:
+	if ev["type"] == "money":
+		_refresh_players()
+		_money_float(int(ev["player"]), int(ev["delta"]))
 	var line := _describe(ev)
 	if line != "":
 		_log.append_text(line + "\n")
@@ -734,12 +753,36 @@ func _on_event(ev: Dictionary) -> void:
 		_show_card(ev)
 
 
+## Aviso flotante "+$200" / "−$50" bajo la tarjeta del jugador.
+func _money_float(pid: int, delta: int) -> void:
+	var card: Control = _player_cards.get(pid)
+	if card == null:
+		return
+	var l := UiKit.label(("+$%d" if delta > 0 else "−$%d") % absi(delta), 22, UiKit.GOOD if delta > 0 else UiKit.DANGER)
+	l.add_theme_constant_override("outline_size", 6)
+	l.add_theme_color_override("font_outline_color", Color.WHITE)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	add_child(l)
+	await get_tree().process_frame
+	if not is_instance_valid(card):
+		l.queue_free()
+		return
+	var stack: int = _floats.get(pid, 0)
+	_floats[pid] = stack + 1
+	l.tree_exited.connect(func(): _floats[pid] = maxi(0, int(_floats.get(pid, 1)) - 1))
+	l.global_position = card.global_position + Vector2(card.size.x / 2.0 - l.size.x / 2.0, card.size.y + 4 + stack * 26)
+	var tw := l.create_tween().set_parallel(true)
+	tw.tween_property(l, "position:y", l.position.y + 26, 1.1).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 1.1).set_delay(0.5)
+	tw.chain().tween_callback(l.queue_free)
+
+
 func _show_card(ev: Dictionary) -> void:
 	for child in _card_panel.get_children():
 		child.queue_free()
 	var destino: bool = ev["deck"] == "destino"
 	var col := Color(0.95, 0.62, 0.15) if destino else Color(0.35, 0.6, 0.85)
-	_card_panel.add_theme_stylebox_override("panel", UiKit.box(Color(0.98, 0.96, 0.9), 14, 20, 16, col))
+	_card_panel.add_theme_stylebox_override("panel", UiKit.box(Color.WHITE, 24, 24, 20, col, 5, true))
 	var v := UiKit.vbox(8)
 	_card_panel.add_child(v)
 	var t := UiKit.label("DESTINO" if destino else "CABILDO", 22, col.darkened(0.3))
@@ -767,7 +810,7 @@ func _describe(ev: Dictionary) -> String:
 			var s := "%s tira %d + %d" % [_pname(int(ev["player"])), d[0], d[1]]
 			if int(d[2]) > 0:
 				s += " · turbo " + (str(d[2]) if int(d[2]) <= 3 else ("»" if int(d[2]) == GameEngine.SPEED_BOLT else "$"))
-			return s + (" [color=#f4bd38]¡dobles![/color]" if ev["double"] else "")
+			return s + (" [color=#e17055]¡dobles![/color]" if ev["double"] else "")
 		"landed":
 			return "%s cae en %s" % [_pname(int(ev["player"])), _space_name(int(ev["space"]))]
 		"bought":
@@ -787,7 +830,7 @@ func _describe(ev: Dictionary) -> String:
 		"declined":
 			return "%s no compra %s" % [_pname(int(ev["player"])), _space_name(int(ev["space"]))]
 		"auction_started":
-			return "[color=#f4bd38]Subasta de %s[/color]" % _space_name(int(ev["space"]))
+			return "[color=#e17055]Subasta de %s[/color]" % _space_name(int(ev["space"]))
 		"bid":
 			return "%s puja $%d" % [_pname(int(ev["player"])), int(ev["amount"])]
 		"bid_pass":
@@ -822,5 +865,5 @@ func _describe(ev: Dictionary) -> String:
 		"connection":
 			return "%s %s" % [_pname(int(ev["player"])), "volvió a conectarse" if ev["connected"] else "se desconectó: la IA toma el control"]
 		"game_over":
-			return "[color=#f4bd38]Fin: gana %s[/color]" % _pname(int(ev["winner"])) if int(ev["winner"]) >= 0 else "Fin de la partida"
+			return "[color=#e17055]Fin: gana %s[/color]" % _pname(int(ev["winner"])) if int(ev["winner"]) >= 0 else "Fin de la partida"
 	return ""

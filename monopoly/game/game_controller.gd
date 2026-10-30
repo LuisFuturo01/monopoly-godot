@@ -28,6 +28,7 @@ func _ready() -> void:
 	player_events = EventPlayer.new()
 	player_events.name = "EventPlayer"
 	add_child(player_events)
+	player_events.drained.connect(func(): if engine: player_events.sync_from(engine))
 
 
 # ---------------------------------------------------------------------------
@@ -37,6 +38,7 @@ func _ready() -> void:
 func start_local(seats: Array, rules: RulesConfig) -> void:
 	engine = GameEngine.new(board, rules)
 	engine.new_game(seats)
+	player_events.sync_from(engine)
 	authority = true
 	networked = false
 	_publish([{"type": "turn_started", "player": 0, "round": 1}])
@@ -45,6 +47,7 @@ func start_local(seats: Array, rules: RulesConfig) -> void:
 func start_host(seats: Array, rules: RulesConfig) -> void:
 	engine = GameEngine.new(board, rules)
 	engine.new_game(seats)
+	player_events.sync_from(engine)
 	authority = true
 	networked = true
 	my_uuid = Profile.uuid
@@ -58,6 +61,7 @@ func start_host(seats: Array, rules: RulesConfig) -> void:
 func start_client(snapshot: Dictionary) -> void:
 	engine = GameEngine.new(board)
 	engine.load_snapshot(snapshot)
+	player_events.sync_from(engine)
 	authority = false
 	networked = true
 	my_uuid = Profile.uuid
@@ -192,4 +196,5 @@ func _on_synced(snapshot: Dictionary, events: Array) -> void:
 
 func _on_resync(snapshot: Dictionary) -> void:
 	engine.load_snapshot(snapshot)
+	player_events.sync_from(engine)
 	state_changed.emit()

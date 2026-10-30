@@ -24,10 +24,7 @@ func _ready() -> void:
 	board = Board.load_from_file(GameController.BOARD_PATH)
 	if not Profile.rules.is_empty():
 		_rules = RulesConfig.from_dict(Profile.rules)
-	var bg := ColorRect.new()
-	bg.color = Color(0.06, 0.08, 0.1)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	add_child(UiKit.gradient_bg())
 	var deco := MenuBackdrop.new()
 	deco.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -56,7 +53,7 @@ func _set_page(content: Control) -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 16)
 	center.add_child(margin)
-	margin.add_child(content)
+	margin.add_child(content if content is PanelContainer else UiKit.panel(content))
 	content.custom_minimum_size.x = minf(content.custom_minimum_size.x, get_viewport_rect().size.x - 32)
 	add_child(scroll)
 	_page = scroll
@@ -64,7 +61,7 @@ func _set_page(content: Control) -> void:
 
 func _title(text: String, sub: String = "") -> VBoxContainer:
 	var v := UiKit.vbox(2)
-	var t := UiKit.label(text, 40, UiKit.ACCENT)
+	var t := UiKit.label(text, 44, UiKit.ACCENT)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
 	if sub != "":
@@ -92,12 +89,23 @@ func show_home(message: String = "") -> void:
 	who.add_child(UiKit.label("Ficha: %s" % Profile.TOKEN_NAMES.get(Profile.token, Profile.token), 14, UiKit.MUTED))
 	chip.add_child(who)
 	chip.add_child(UiKit.button("Editar perfil", show_profile))
-	v.add_child(UiKit.panel(chip))
-	v.add_child(UiKit.button("Jugar contra la IA", func(): show_setup("ai"), true))
-	v.add_child(UiKit.button("Pasar y jugar (mismo dispositivo)", func(): show_setup("local")))
-	v.add_child(UiKit.button("Red local Wi-Fi", func(): show_network("wifi")))
-	v.add_child(UiKit.button("Bluetooth", func(): show_network("bluetooth")))
-	v.add_child(UiKit.button("Salir", func(): get_tree().quit()))
+	v.add_child(UiKit.panel(chip, UiKit.SOFT))
+	v.add_child(UiKit.button("¡Jugar contra la IA!", func(): show_setup("ai"), true))
+	v.add_child(UiKit.button("Pasar y jugar (mismo dispositivo)", func(): show_setup("local"), true, UiKit.ACCENT_2.darkened(0.1)))
+	var net_row := UiKit.hbox(10)
+	for spec in [["Wi-Fi local", "wifi"], ["Bluetooth", "bluetooth"]]:
+		var b := UiKit.button(spec[0], func(): show_network(spec[1]))
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		net_row.add_child(b)
+	v.add_child(net_row)
+	var misc_row := UiKit.hbox(10)
+	var opts := UiKit.button("Opciones", func(): _set_page(OptionsPanel.build(func(): show_home())))
+	opts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	misc_row.add_child(opts)
+	var quit := UiKit.button("Salir", func(): get_tree().quit())
+	quit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	misc_row.add_child(quit)
+	v.add_child(misc_row)
 	_set_page(v)
 
 
@@ -142,7 +150,7 @@ func show_profile() -> void:
 			b.toggle_mode = true
 			b.button_pressed = t == sel["token"]
 			if b.button_pressed:
-				b.add_theme_stylebox_override("normal", UiKit.box(Color(0.2, 0.24, 0.28), 10, 8, 8, UiKit.ACCENT))
+				b.add_theme_stylebox_override("normal", UiKit.box(Color("#efeaff"), 18, 8, 8, UiKit.ACCENT, 3))
 			var col := UiKit.vbox(2)
 			col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			col.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -163,7 +171,7 @@ func show_profile() -> void:
 			var cb := Button.new()
 			cb.custom_minimum_size = Vector2(42, 42)
 			cb.focus_mode = Control.FOCUS_NONE
-			cb.add_theme_stylebox_override("normal", UiKit.box(Color.html(c), 21, 0, 0, Color.WHITE if c == sel["color"] else Color(0, 0, 0, 0)))
+			cb.add_theme_stylebox_override("normal", UiKit.box(Color.html(c), 21, 0, 0, UiKit.TEXT if c == sel["color"] else Color(0, 0, 0, 0), 4))
 			cb.add_theme_stylebox_override("hover", UiKit.box(Color.html(c).lightened(0.2), 21, 0, 0))
 			cb.pressed.connect(func():
 				sel["color"] = c
@@ -363,7 +371,7 @@ func _rules_panel(r: RulesConfig, on_change: Callable, editable: bool = true) ->
 		checks["speed_die"].button_pressed = r.speed_die
 		hotel.button_pressed = r.houses_per_hotel == 3
 		on_change.call())
-	return UiKit.panel(v)
+	return UiKit.panel(v, UiKit.SOFT)
 
 
 # ---------------------------------------------------------------------------
@@ -396,7 +404,7 @@ func show_network(kind: String) -> void:
 			show_home("No se pudo crear la sala (error %d)" % err)
 		else:
 			show_lobby(), true))
-	v.add_child(UiKit.panel(host_box))
+	v.add_child(UiKit.panel(host_box, UiKit.SOFT))
 	var join_box := UiKit.vbox(8)
 	join_box.add_child(UiKit.label("Unirse", 20, UiKit.ACCENT))
 	_hosts_list = UiKit.vbox(6)
@@ -413,7 +421,7 @@ func show_network(kind: String) -> void:
 		manual.add_child(ip)
 		manual.add_child(UiKit.button("Conectar", func(): _join(kind, ip.text.strip_edges())))
 		join_box.add_child(manual)
-	v.add_child(UiKit.panel(join_box))
+	v.add_child(UiKit.panel(join_box, UiKit.SOFT))
 	v.add_child(UiKit.button("Volver", func():
 		Net.leave()
 		show_home()))
@@ -546,20 +554,25 @@ func _dedupe_tokens(seats: Array) -> Array:
 
 
 class MenuBackdrop extends Control:
-	## Fondo decorativo: casillas de colores girando lentamente.
+	## Fondo animado: burbujas y dados translúcidos que flotan.
 	var _t := 0.0
 
 	func _process(delta: float) -> void:
-		_t += delta * 0.05
+		_t += delta
 		queue_redraw()
 
 	func _draw() -> void:
-		var colors := ["#7a4a2a", "#7fc8e8", "#d0559a", "#f08a24", "#d6332e", "#f2cf2f", "#2f9e55", "#2a4fb0"]
-		var c := size / 2.0
-		var r := maxf(size.x, size.y) * 0.55
-		for k in 32:
-			var a := _t + k * TAU / 32.0
-			var p := c + Vector2(cos(a), sin(a)) * r
-			draw_set_transform(p, a, Vector2.ONE)
-			draw_rect(Rect2(-40, -60, 80, 120), Color.html(colors[k % 8]).darkened(0.55))
-		draw_set_transform_matrix(Transform2D.IDENTITY)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 11
+		for k in 26:
+			var base := Vector2(rng.randf() * size.x, rng.randf() * size.y)
+			var r := rng.randf_range(14, 70)
+			var speed := rng.randf_range(8, 22)
+			var p := Vector2(base.x + sin(_t * 0.3 + k) * 20.0, fposmod(base.y - _t * speed, size.y + 160) - 80)
+			var col := Color(1, 1, 1, 0.08 + 0.06 * (k % 3))
+			if k % 4 == 0:
+				draw_set_transform(p, _t * 0.2 + k, Vector2.ONE)
+				draw_rect(Rect2(-r / 2, -r / 2, r, r), col)
+				draw_set_transform_matrix(Transform2D.IDENTITY)
+			else:
+				draw_circle(p, r / 2, col)

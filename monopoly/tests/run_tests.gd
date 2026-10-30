@@ -23,6 +23,9 @@ func _init() -> void:
 		"test_mortgage_rules",
 		"test_debt_then_bankruptcy_to_creditor",
 		"test_bankruptcy_to_bank_frees_properties",
+		"test_bankruptcy_to_bank_auctions_properties",
+		"test_mortgaged_trade_pays_interest",
+		"test_shown_position_follows_events",
 		"test_house_rules",
 		"test_trade",
 		"test_cards_jail_free_leaves_deck",
@@ -253,6 +256,52 @@ func test_bankruptcy_to_bank_frees_properties() -> void:
 	run(e, {"type": "bankrupt", "player": 0})
 	check(e.owner_of(1) == -1 and not e.is_mortgaged(1), "propiedad vuelve al banco libre")
 	check(e.is_over() and int(e.s["winner"]) == 1, "gana el último en pie")
+
+
+func test_bankruptcy_to_bank_auctions_properties() -> void:
+	print("test_bankruptcy_to_bank_auctions_properties")
+	var e := mk(3)
+	e.s["owner"][1] = 0
+	e.s["owner"][3] = 0
+	e.player(0)["cash"] = 10
+	e.player(0)["pos"] = 1
+	roll(e, 0, 1, 3)                           # -> 5 Tasa Municipal
+	run(e, {"type": "bankrupt", "player": 0})
+	check(e.phase() == GameEngine.AUCTION, "el banco subasta la primera propiedad")
+	check(int(e.s["auction"]["space"]) == 1 and e.s["auction"]["bidders"] == [1, 2], "subasta abierta a los activos")
+	run(e, {"type": "bid", "player": 1, "amount": 30})
+	run(e, {"type": "pass_bid", "player": 2})
+	check(e.owner_of(1) == 1, "propiedad subastada")
+	check(e.phase() == GameEngine.AUCTION and int(e.s["auction"]["space"]) == 3, "sigue la segunda subasta")
+	run(e, {"type": "pass_bid", "player": 1})
+	run(e, {"type": "pass_bid", "player": 2})
+	check(e.owner_of(3) == -1, "sin pujas queda en el banco")
+	check(e.current() == 1 and e.phase() == GameEngine.PRE_ROLL, "luego pasa el turno")
+
+
+func test_mortgaged_trade_pays_interest() -> void:
+	print("test_mortgaged_trade_pays_interest")
+	var e := mk(2)
+	e.s["owner"][4] = 1
+	e.s["mortgaged"][4] = true
+	run(e, {"type": "trade_propose", "player": 0, "to": 1, "give": {"cash": 50}, "get": {"props": [4]}})
+	run(e, {"type": "trade_accept", "player": 1})
+	check(e.owner_of(4) == 0 and e.is_mortgaged(4), "recibe la propiedad hipotecada")
+	check(int(e.player(0)["cash"]) == 1500 - 50 - 10, "paga 10% de interés")
+	check(e.phase() == GameEngine.PRE_ROLL, "conserva su tirada")
+
+
+func test_shown_position_follows_events() -> void:
+	print("test_shown_position_follows_events")
+	var e := mk(2)
+	var ep := EventPlayer.new()
+	ep.sync_from(e)
+	var r := roll(e, 0, 3, 4)
+	check(int(ep.shown_pos[0]) == 0, "antes de reproducir, la ficha sigue en la salida")
+	for ev in r["events"]:
+		ep._track(ev)
+	check(int(ep.shown_pos[0]) == 7, "tras el evento de movimiento llega a destino")
+	ep.free()
 
 
 func test_house_rules() -> void:

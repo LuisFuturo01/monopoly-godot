@@ -2,6 +2,8 @@ extends Node
 ## Autoload "Profile": identidad local del jugador (sin autenticación) y ajustes.
 ## El UUID se genera una vez por dispositivo y sirve para reconectar a partidas en red.
 
+signal settings_changed
+
 const PATH := "user://profile.cfg"
 const COLORS := ["#e04848", "#3d7be0", "#3fb36b", "#f0b429", "#9b59d0", "#ef7d3c", "#1fb5b5", "#e05aa8"]
 const TOKEN_NAMES := {
@@ -18,6 +20,9 @@ var view_mode := "3d"          # "3d" | "2d"
 var music_volume := 0.5
 var sfx_volume := 0.8
 var last_host := ""
+var anim_speed := 1.0          # 0.75 relajado, 1 normal, 1.6 rápido
+var cinematic := true
+var show_log := false
 var rules: Dictionary = {}
 
 
@@ -37,6 +42,9 @@ func load_profile() -> void:
 		music_volume = cfg.get_value("settings", "music_volume", music_volume)
 		sfx_volume = cfg.get_value("settings", "sfx_volume", sfx_volume)
 		last_host = cfg.get_value("settings", "last_host", last_host)
+		anim_speed = cfg.get_value("settings", "anim_speed", anim_speed)
+		cinematic = cfg.get_value("settings", "cinematic", cinematic)
+		show_log = cfg.get_value("settings", "show_log", show_log)
 		rules = cfg.get_value("settings", "rules", rules)
 	if uuid == "":
 		uuid = _new_uuid()
@@ -54,8 +62,17 @@ func save_profile() -> void:
 	cfg.set_value("settings", "music_volume", music_volume)
 	cfg.set_value("settings", "sfx_volume", sfx_volume)
 	cfg.set_value("settings", "last_host", last_host)
+	cfg.set_value("settings", "anim_speed", anim_speed)
+	cfg.set_value("settings", "cinematic", cinematic)
+	cfg.set_value("settings", "show_log", show_log)
 	cfg.set_value("settings", "rules", rules)
 	cfg.save(PATH)
+
+
+## Guarda y avisa a quien aplique los ajustes (vista, cámara, velocidad).
+func apply_settings() -> void:
+	save_profile()
+	settings_changed.emit()
 
 
 func as_seat() -> Dictionary:

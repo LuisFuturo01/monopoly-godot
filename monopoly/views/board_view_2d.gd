@@ -5,10 +5,11 @@ extends Control
 
 signal space_clicked(index: int)
 
-const TABLE := Color(0.09, 0.12, 0.11)
-const PAPER := Color(0.95, 0.94, 0.87)
-const CENTER_FILL := Color(0.80, 0.88, 0.81)
-const INK := Color(0.12, 0.12, 0.14)
+const TABLE := Color("#2ec4b6")
+const PAPER := Color("#fffaf0")
+const CENTER_FILL := Color("#b8e994")
+const INK := Color("#2d3436")
+const RIM := Color("#6c5ce7")
 
 var controller: GameController
 var active := true
@@ -24,10 +25,11 @@ var _dice := [1, 1, 0]
 var _dice_t := -1.0
 var _rng := RandomNumberGenerator.new()
 var _font: Font
+var _pop: Dictionary = {}           # casilla -> progreso 0..1 de la obra
 
 
 func _ready() -> void:
-	_font = ThemeDB.fallback_font
+	_font = UiKit.font()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
@@ -63,7 +65,9 @@ func _on_event(ev: Dictionary) -> void:
 				tok["queue"].append(BoardLayout.rect(int(i)).get_center())
 		"jailed":
 			var tok2 := _token(int(ev["player"]))
-			tok2["queue"].append(BoardLayout.rect(controller.board.jail_index).get_center())
+			tok2["queue"].append(BoardLayout.rect(int(ev["space"])).get_center())
+		"built":
+			_pop[int(ev["space"])] = 0.0
 	queue_redraw()
 
 
@@ -85,10 +89,11 @@ func _snap_tokens() -> void:
 
 func _rest_point(pid: int) -> Vector2:
 	var e := controller.engine
-	var space: int = e.player(pid)["pos"]
+	var shown: Dictionary = controller.player_events.shown_pos
+	var space: int = shown.get(pid, e.player(pid)["pos"])
 	var here := []
 	for p in e.players():
-		if not p["bankrupt"] and int(p["pos"]) == space:
+		if not p["bankrupt"] and int(shown.get(int(p["id"]), p["pos"])) == space:
 			here.append(int(p["id"]))
 	return BoardLayout.token_point(space, maxi(0, here.find(pid)), here.size())
 
@@ -97,6 +102,11 @@ func _process(delta: float) -> void:
 	if controller == null or controller.engine == null:
 		return
 	var animating := false
+	for i in _pop.keys():
+		_pop[i] += delta * 2.0
+		if _pop[i] >= 1.0:
+			_pop.erase(i)
+		animating = true
 	if _dice_t >= 0.0:
 		_dice_t += delta
 		if _dice_t > EventPlayer.DICE_TIME:
@@ -151,7 +161,8 @@ func _draw() -> void:
 	_scale = minf(avail.x, avail.y) / BoardLayout.SIZE
 	var board_px := BoardLayout.SIZE * _scale
 	_origin = Vector2((size.x - board_px) / 2.0, margin_top + (avail.y - board_px) / 2.0)
-	draw_rect(Rect2(_origin + Vector2(6, 8), Vector2(board_px, board_px)), Color(0, 0, 0, 0.4))
+	draw_rect(Rect2(_origin + Vector2(6, 10), Vector2(board_px, board_px)), Color(0, 0, 0, 0.18))
+	draw_rect(Rect2(_origin - Vector2(8, 8), Vector2(board_px + 16, board_px + 16)), RIM)
 	draw_rect(Rect2(_origin, Vector2(board_px, board_px)), PAPER)
 	var inner := BoardLayout.CORNER * _scale
 	draw_rect(Rect2(_origin + Vector2(inner, inner), Vector2(board_px - inner * 2, board_px - inner * 2)), CENTER_FILL)
@@ -214,6 +225,8 @@ func _draw_space(i: int) -> void:
 
 
 func _draw_corner(i: int, sp: Dictionary, lw: float, lh: float) -> void:
+	var tiles := {"go": Color("#55efc4"), "jail": Color("#fdcb6e"), "free": Color("#74b9ff"), "gotojail": Color("#ff7675")}
+	draw_rect(Rect2(-lw / 2, -lh / 2, lw, lh), tiles.get(sp["type"], PAPER))
 	var fs := maxi(8, int(_scale * 0.2))
 	var labels := {"go": "SALIDA\ncobra $%d" % controller.board.salary, "jail": "RETÉN\nde visita", "free": "MIRADOR", "gotojail": "¡AL\nRETÉN!"}
 	var icon := {"go": "<<<", "jail": "| | |", "free": "*", "gotojail": "!"}
@@ -242,6 +255,8 @@ func _draw_buildings(i: int, band: Rect2) -> void:
 	if h == 0:
 		return
 	var unit := band.size.y * 0.7
+	if _pop.has(i):
+		unit *= maxf(0.05, ease(_pop[i], -2.2))
 	if h == GameEngine.HOTEL:
 		var hr := Rect2(band.get_center() - Vector2(unit * 1.2, unit / 2), Vector2(unit * 2.4, unit))
 		draw_rect(hr, Color(0.85, 0.12, 0.12))
@@ -258,7 +273,7 @@ func _draw_center(board_px: float) -> void:
 	var c := _origin + Vector2(board_px, board_px) / 2.0
 	var fs := maxi(8, int(_scale * 0.75))
 	draw_set_transform(c, -PI / 4.0, Vector2.ONE)
-	draw_string(_font, Vector2(-board_px / 2, -fs * 0.2), "MAGNATES", HORIZONTAL_ALIGNMENT_CENTER, board_px, fs, Color(0.72, 0.13, 0.12))
+	draw_string(_font, Vector2(-board_px / 2, -fs * 0.2), "MAGNATES", HORIZONTAL_ALIGNMENT_CENTER, board_px, fs, Color("#fd79a8"))
 	draw_string(_font, Vector2(-board_px / 2, fs * 0.6), controller.board.name, HORIZONTAL_ALIGNMENT_CENTER, board_px, maxi(6, int(fs * 0.35)), INK)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 	# Mazos
