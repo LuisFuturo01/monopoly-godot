@@ -28,7 +28,7 @@ func host(_port: int = DEFAULT_PORT, _max_clients: int = MAX_CLIENTS) -> Error:
 	if not is_available():
 		return ERR_UNAVAILABLE
 	var p := BluetoothMultiplayerPeer.new(bridge())
-	var err := p.create_server("Magnates")
+	var err := p.create_server("Luchopolis")
 	if err == OK:
 		peer = p
 	return err

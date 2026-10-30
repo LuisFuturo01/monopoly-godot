@@ -143,6 +143,7 @@ func test_decline_starts_auction() -> void:
 	roll(e, 0, 1, 2)
 	run(e, {"type": "decline", "player": 0})
 	check(e.phase() == GameEngine.AUCTION, "subasta iniciada")
+	check(e.min_bid() == 1, "la primera puja puede ser de cualquier monto")
 	check(e.pending_actor() == 1, "puja empieza por el siguiente jugador")
 	run(e, {"type": "bid", "player": 1, "amount": 10})
 	check(not run(e, {"type": "bid", "player": 2, "amount": 15})["ok"], "puja mínima respetada")
@@ -289,6 +290,9 @@ func test_mortgaged_trade_pays_interest() -> void:
 	check(e.owner_of(4) == 0 and e.is_mortgaged(4), "recibe la propiedad hipotecada")
 	check(int(e.player(0)["cash"]) == 1500 - 50 - 10, "paga 10% de interés")
 	check(e.phase() == GameEngine.PRE_ROLL, "conserva su tirada")
+	check(e.unmortgage_cost(4) == board.mortgage_value(4), "levantarla en el mismo turno cuesta solo el valor (10% ya pagado)")
+	run(e, {"type": "unmortgage", "player": 0, "space": 4})
+	check(not e.is_mortgaged(4) and int(e.player(0)["cash"]) == 1440 - board.mortgage_value(4), "hipoteca levantada al valor + 10% total")
 
 
 func test_shown_position_follows_events() -> void:

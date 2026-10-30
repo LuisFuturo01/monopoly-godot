@@ -73,6 +73,15 @@ func _start_demo() -> void:
 	var rules := RulesConfig.classic()
 	rules.speed_die = true
 	_start_game("local", seats, rules)
+	if _args.has("cam"):
+		# --cam=yaw_grados,pitch_grados,distancia,x,z  (solo para revisar la escena 3D)
+		var c: PackedStringArray = _args["cam"].split(",")
+		Profile.cinematic = false
+		_view3d.cinematic = false
+		_view3d._cam_yaw = deg_to_rad(float(c[0]))
+		_view3d._cam_pitch = deg_to_rad(float(c[1]))
+		_view3d._cam_dist = float(c[2])
+		_view3d._cam_target = Vector3(float(c[3]), 0.3, float(c[4]))
 	if _args.has("think"):
 		_controller.ai_think_time = float(_args["think"])
 	if _args.has("log"):

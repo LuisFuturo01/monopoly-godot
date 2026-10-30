@@ -273,7 +273,7 @@ func _draw_center(board_px: float) -> void:
 	var c := _origin + Vector2(board_px, board_px) / 2.0
 	var fs := maxi(8, int(_scale * 0.75))
 	draw_set_transform(c, -PI / 4.0, Vector2.ONE)
-	draw_string(_font, Vector2(-board_px / 2, -fs * 0.2), "MAGNATES", HORIZONTAL_ALIGNMENT_CENTER, board_px, fs, Color("#fd79a8"))
+	draw_string(_font, Vector2(-board_px / 2, -fs * 0.2), "LUCHOPOLIS", HORIZONTAL_ALIGNMENT_CENTER, board_px, fs, Color("#fd79a8"))
 	draw_string(_font, Vector2(-board_px / 2, fs * 0.6), controller.board.name, HORIZONTAL_ALIGNMENT_CENTER, board_px, maxi(6, int(fs * 0.35)), INK)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 	# Mazos

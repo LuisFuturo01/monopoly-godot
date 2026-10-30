@@ -85,7 +85,7 @@ func _manage(e: GameEngine, pid: int, level: int) -> Dictionary:
 		return {}
 	# Primero, levantar hipotecas de grupos completos (habilita construir).
 	for i in e.properties_of(pid):
-		if e.is_mortgaged(i) and e.board.unmortgage_cost(i) <= spare:
+		if e.is_mortgaged(i) and e.unmortgage_cost(i) <= spare:
 			if e.owns_group(pid, e.board.group_of(i)) or level == Level.MEDIUM:
 				return _cmd(pid, "unmortgage", {"space": i})
 	var best := -1

@@ -510,7 +510,7 @@ func _build_city() -> void:
 		_label("DESTINO ?" if k == 0 else "CABILDO !", pos + Vector3(0, 0.265, 0), -PI / 4.0, 44, 1.1, Color.WHITE)
 	_box(Vector3(2.3, 0.12, 0.5), Vector3(2.35, 0.1, 3.75), _mat(INK, 0.3))
 	_box(Vector3(2.36, 0.02, 0.56), Vector3(2.35, 0.04, 3.75), _mat(TRIM, 0.3, 0.6))
-	var logo := _label("MAGNATES", Vector3(2.35, 0.165, 3.75), 0.0, 84, 2.2, TRIM)
+	var logo := _label("LUCHOPOLIS", Vector3(2.35, 0.165, 3.75), 0.0, 76, 2.2, TRIM)
 	logo.outline_size = 0
 
 
@@ -605,31 +605,62 @@ func _district_park(c: Vector2) -> void:
 	_cyl(1.05, 1.05, 0.022, Vector3(c.x, 0.052, c.y), _mat(Color("#e6dcc4"), 0.85), self, 40)
 	_cyl(0.95, 0.95, 0.024, Vector3(c.x, 0.054, c.y), _mat(Color("#8cc56a"), 0.9), self, 40)
 	var water := StandardMaterial3D.new()
-	water.albedo_color = Color(0.3, 0.6, 0.85, 0.85)
-	water.roughness = 0.04
-	water.metallic = 0.3
+	water.albedo_color = Color(0.25, 0.58, 0.88, 0.88)
+	water.roughness = 0.03
+	water.metallic = 0.35
+	water.emission_enabled = true
+	water.emission = Color(0.15, 0.4, 0.7)
+	water.emission_energy_multiplier = 0.25
 	water.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_cyl(0.55, 0.55, 0.03, Vector3(c.x, 0.07, c.y), water, self, 36)
-	_cyl(0.58, 0.6, 0.05, Vector3(c.x, 0.06, c.y), _mat(Color("#cfc9bd"), 0.7), self, 36)
-	_cyl(0.07, 0.1, 0.16, Vector3(c.x, 0.13, c.y), _mat(Color("#e9e4da"), 0.5), self, 16)
+	var stone := _mat(Color("#d6cfc2"), 0.6)
+	# Estanque: borde de piedra y lámina de agua con el doble de grosor que antes.
+	_cyl(0.62, 0.66, 0.12, Vector3(c.x, 0.11, c.y), stone, self, 40)
+	_cyl(0.56, 0.56, 0.06, Vector3(c.x, 0.15, c.y), water, self, 40)
+	# Columna central y taza superior con su propia agua.
+	_cyl(0.06, 0.09, 0.3, Vector3(c.x, 0.27, c.y), stone, self, 16)
+	_cyl(0.24, 0.14, 0.08, Vector3(c.x, 0.44, c.y), stone, self, 24)
+	_cyl(0.21, 0.21, 0.04, Vector3(c.x, 0.47, c.y), water, self, 24)
+	_cyl(0.03, 0.04, 0.14, Vector3(c.x, 0.55, c.y), stone, self, 12)
+	var drop := SphereMesh.new()
+	drop.radius = 0.016
+	drop.height = 0.032
+	var dm := StandardMaterial3D.new()
+	dm.albedo_color = Color(0.85, 0.95, 1.0, 0.85)
+	dm.emission_enabled = true
+	dm.emission = Color(0.7, 0.85, 1.0)
+	dm.emission_energy_multiplier = 0.4
+	dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Chorro central que sube y cae en la taza.
 	var spray := CPUParticles3D.new()
-	spray.amount = 40
+	spray.amount = 70
 	spray.lifetime = 0.9
 	spray.direction = Vector3.UP
-	spray.spread = 18.0
-	spray.initial_velocity_min = 0.6
-	spray.initial_velocity_max = 0.8
-	spray.gravity = Vector3(0, -1.6, 0)
-	var drop := SphereMesh.new()
-	drop.radius = 0.012
-	drop.height = 0.024
+	spray.spread = 12.0
+	spray.initial_velocity_min = 0.9
+	spray.initial_velocity_max = 1.1
+	spray.gravity = Vector3(0, -2.2, 0)
 	spray.mesh = drop
-	var dm := StandardMaterial3D.new()
-	dm.albedo_color = Color(0.85, 0.95, 1.0, 0.8)
-	dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	spray.material_override = dm
-	spray.position = Vector3(c.x, 0.22, c.y)
+	spray.position = Vector3(c.x, 0.62, c.y)
 	add_child(spray)
+	# Cortina que rebosa de la taza al estanque.
+	var curtain := CPUParticles3D.new()
+	curtain.amount = 90
+	curtain.lifetime = 0.45
+	curtain.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	curtain.emission_ring_axis = Vector3.UP
+	curtain.emission_ring_radius = 0.22
+	curtain.emission_ring_inner_radius = 0.2
+	curtain.emission_ring_height = 0.0
+	curtain.direction = Vector3.DOWN
+	curtain.spread = 5.0
+	curtain.initial_velocity_min = 0.05
+	curtain.initial_velocity_max = 0.1
+	curtain.gravity = Vector3(0, -1.6, 0)
+	curtain.mesh = drop
+	curtain.material_override = dm
+	curtain.position = Vector3(c.x, 0.46, c.y)
+	add_child(curtain)
 	for k in 10:
 		var a := k * TAU / 10.0
 		_tree(Vector3(c.x + cos(a) * 1.08, 0.06, c.y + sin(a) * 1.08), _rng.randf_range(0.8, 1.15))
@@ -661,16 +692,36 @@ func _plaza() -> void:
 func _mountains() -> void:
 	var rock := _mat(Color("#7d8aa3"), 0.85)
 	var rock2 := _mat(Color("#69768f"), 0.85)
-	var snow := _mat(Color("#f7fbff"), 0.5)
+	var snow := StandardMaterial3D.new()
+	snow.albedo_color = Color("#ffffff")
+	snow.roughness = 0.35
+	snow.emission_enabled = true
+	snow.emission = Color("#dfeaff")
+	snow.emission_energy_multiplier = 0.35
 	var peaks := [[Vector3(-3.35, 0, -3.65), 0.7, 1.0], [Vector3(-2.6, 0, -3.85), 0.5, 0.75], [Vector3(-3.95, 0, -3.1), 0.42, 0.6]]
 	for pk in peaks:
 		var base: Vector3 = pk[0]
 		var r: float = pk[1]
 		var h: float = pk[2]
+		var stretch := Vector3(1.15, 1, 0.85)
 		var m := _cyl(0.0, r, h, base + Vector3(0, h / 2.0 + 0.04, 0), rock if r > 0.55 else rock2, self, 9)
-		m.scale = Vector3(1.15, 1, 0.85)
-		var cap := _cyl(0.0, r * 0.42, h * 0.42, base + Vector3(0, h * 0.79 + 0.04, 0), snow, self, 9)
-		cap.scale = Vector3(1.15, 1, 0.85)
+		m.scale = stretch
+		# Casquete de nieve el doble de grueso (cubre el 55 % superior) y apenas más ancho
+		# que la roca para que no parpadee contra ella.
+		var cap_h := h * 0.55
+		var cap_r := r * 0.55 * 1.06
+		var cap := _cyl(0.0, cap_r, cap_h, base + Vector3(0, h - cap_h / 2.0 + 0.045, 0), snow, self, 9)
+		cap.scale = stretch
+		# Lenguas de nieve que bajan por las laderas.
+		for k in 5:
+			var a := k * TAU / 5.0 + 0.3
+			var tongue_h := h * _rng.randf_range(0.22, 0.32)
+			var tip := base + Vector3(cos(a) * r * 0.42 * stretch.x, h * 0.42, sin(a) * r * 0.42 * stretch.z)
+			var tongue := _cyl(0.0, r * 0.16, tongue_h, tip, snow, self, 6)
+			tongue.rotation = Vector3(0, -a, 0)
+			tongue.rotate_object_local(Vector3.FORWARD, 0.0)
+			tongue.look_at_from_position(tip, base + Vector3(0, h + 0.04, 0), Vector3.UP)
+			tongue.rotate_object_local(Vector3.RIGHT, -PI / 2.0)
 
 
 func _build_cable_car() -> void:

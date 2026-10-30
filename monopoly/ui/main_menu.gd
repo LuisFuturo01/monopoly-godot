@@ -106,7 +106,7 @@ func show_home(message: String = "") -> void:
 	Net.discovery.stop()
 	var v := UiKit.vbox(14)
 	v.custom_minimum_size = Vector2(460, 0)
-	var logo := UiKit.label("MAGNATES", 64, UiKit.HEADING)
+	var logo := UiKit.label("LUCHOPOLIS", 60, UiKit.HEADING)
 	logo.add_theme_font_override("font", UiKit.font_black())
 	logo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(logo)
@@ -439,7 +439,7 @@ func _mini_segment(options: Array, selected: int, on_pick: Callable) -> Control:
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(76, 46)
-		b.add_theme_stylebox_override("normal", UiKit.box(UiKit.SOFT, 14, 8, 6))
+		b.add_theme_stylebox_override("normal", UiKit.box(Color.WHITE, 14, 8, 6, UiKit.LINE, 2))
 		b.add_theme_stylebox_override("pressed", UiKit.box(UiKit.NAVY, 14, 8, 6))
 		b.add_theme_stylebox_override("hover_pressed", UiKit.box(UiKit.NAVY, 14, 8, 6))
 		b.add_theme_color_override("font_pressed_color", Color.WHITE)

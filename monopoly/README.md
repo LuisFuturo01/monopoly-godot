@@ -1,4 +1,4 @@
-# Magnates — juego de propiedades (Godot 4.7)
+# Luchopolis — juego de propiedades (Godot 4.7)
 
 Juego de mesa de compra-venta de propiedades con temática de La Paz / El Alto:
 tablero, cartas (Destino / Cabildo), fichas (llama, charango, cabina, bombín,
@@ -79,6 +79,26 @@ tirar/terminar hasta que el destinatario responde.
   libre tras resolver la caída; $ da un bono de $50.
 - Reglas de la casa: bote en el Mirador, $400 al caer justo en la Salida, sin alquiler
   desde el Retén.
+
+### Comparación con el reglamento clásico
+
+Revisado contra el reglamento clásico (alquiler doble con grupo completo, hotel solo con
+4 casas en todo el grupo, venta pareja a mitad de precio, hipoteca + 10 %, quiebra y
+subasta del banco, Mirador sin premio, sueldo al pasar o caer en la Salida, alquiler
+cobrable desde el Retén). Ajustes para cumplirlo:
+
+- La primera puja de una subasta puede ser de cualquier monto (desde Bs 1); las
+  siguientes suben de a Bs 10 para que las subastas no se eternicen.
+- Quien recibe una propiedad hipotecada paga el 10 % de interés; si la levanta en ese
+  mismo turno solo paga el valor de hipoteca (total: valor + 10 %). Si espera, levantarla
+  vuelve a costar valor + 10 %.
+
+Diferencias que quedan, propias de la versión digital:
+
+- El alquiler se cobra automáticamente (no hay que "pedirlo" antes de la siguiente tirada).
+- Solo se construye en el propio turno (el reglamento también permite entre turnos ajenos).
+- Si el banco se queda sin casas u hoteles, simplemente no se puede construir; no se
+  subastan los edificios escasos.
 
 ## Perfil sin autenticación
 

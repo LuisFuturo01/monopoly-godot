@@ -316,7 +316,7 @@ func can_unmortgage(pid: int, i: int) -> String:
 		return "No es tu propiedad"
 	if not is_mortgaged(i):
 		return "No está hipotecada"
-	if player(pid)["cash"] < board.unmortgage_cost(i):
+	if player(pid)["cash"] < unmortgage_cost(i):
 		return "Dinero insuficiente"
 	return ""
 
@@ -786,7 +786,8 @@ func _start_auction(i: int, decliner: int) -> void:
 
 func min_bid() -> int:
 	var a: Dictionary = s["auction"]
-	return int(a["high"]) + rules.auction_min_increment if int(a["high_bidder"]) >= 0 else rules.auction_min_increment
+	# Reglamento: la primera puja puede ser de cualquier monto; las siguientes suben de a Bs 10.
+	return int(a["high"]) + rules.auction_min_increment if int(a["high_bidder"]) >= 0 else 1
 
 
 func _cmd_bid(pid: int, amount: int) -> String:
@@ -923,7 +924,8 @@ func _cmd_unmortgage(pid: int, i: int) -> String:
 		err = can_unmortgage(pid, i) if i >= 0 else "Casilla inválida"
 	if err != "":
 		return err
-	_transfer(pid, BANK, board.unmortgage_cost(i), "Levantar hipoteca")
+	_transfer(pid, BANK, unmortgage_cost(i), "Levantar hipoteca")
+	s["interest_paid"] = s.get("interest_paid", []).filter(func(x): return int(x) != i)
 	s["mortgaged"][i] = false
 	_ev("unmortgaged", {"player": pid, "space": i})
 	return ""
@@ -1080,6 +1082,7 @@ func _next_turn() -> void:
 	s["extra_roll"] = false
 	s["bolt_pending"] = false
 	s["trade_proposals"] = 0
+	s["interest_paid"] = []
 	s["phase"] = PRE_ROLL
 	_ev("turn_started", {"player": current(), "round": s["round"]})
 
@@ -1165,6 +1168,18 @@ func _cmd_trade_accept(pid: int) -> String:
 func _charge_mortgage_interest(receiver: int, i: int) -> void:
 	if is_mortgaged(i):
 		_charge(receiver, BANK, int(ceil(board.mortgage_value(i) * 0.1)), "Interés de hipoteca")
+		if not s.has("interest_paid"):
+			s["interest_paid"] = []
+		s["interest_paid"].append(i)
+
+
+## Costo de levantar la hipoteca. Si se recibió hipotecada en este turno ya pagó el 10 %,
+## así que levantarla ahora cuesta solo el valor de hipoteca (total: valor + 10 %, como el
+## reglamento). Si se espera a otro turno, vuelve a costar valor + 10 %.
+func unmortgage_cost(i: int) -> int:
+	if i in s.get("interest_paid", []):
+		return board.mortgage_value(i)
+	return board.unmortgage_cost(i)
 
 
 func _swap(src: int, dst: int, o: Dictionary) -> void:

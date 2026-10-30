@@ -398,13 +398,20 @@ func _refresh_auction() -> void:
 	var cash: int = en.player(local)["cash"]
 	var row := HFlowContainer.new()
 	row.add_theme_constant_override("h_separation", 6)
+	row.add_theme_constant_override("v_separation", 6)
 	v.add_child(row)
 	var base := en.min_bid()
-	for extra in [0, 40, 90, 190]:
-		var amount: int = base + extra
+	# Montos redondos sugeridos: la mínima y saltos de 10 %, 25 % y 50 % del precio.
+	var price := controller.board.price(i)
+	var amounts := [base]
+	for f in [0.1, 0.25, 0.5]:
+		var amt := int(ceil((base + price * f) / 10.0) * 10)
+		if amt > amounts.back():
+			amounts.append(amt)
+	for amount in amounts:
 		if amount > cash:
 			break
-		row.add_child(UiKit.button("Bs %d" % amount, func(): Sfx.play("bid"); _submit({"type": "bid", "player": local, "amount": amount}), extra == 0))
+		row.add_child(UiKit.button("Bs %d" % amount, func(): Sfx.play("bid"); _submit({"type": "bid", "player": local, "amount": amount}), amount == base))
 	row.add_child(UiKit.button("Retirarme", func(): _submit({"type": "pass_bid", "player": local})))
 
 
@@ -661,25 +668,28 @@ func _row(parent: Control, a: String, b: String) -> void:
 
 func _manage_buttons(row: Control, me: int, i: int) -> void:
 	var en := e()
+	var b := controller.board
 	var legal := en.legal_actions(me)
+	var refund := b.house_cost(i) / 2
 	var specs := [
-		["build", "+ Casa (Bs %d)" % controller.board.house_cost(i), en.can_build(me, i)],
-		["sell_building", "− Casa", en.can_sell_building(me, i)],
-		["mortgage", "Hipotecar", en.can_mortgage(me, i)],
-		["unmortgage", "Levantar (Bs %d)" % controller.board.unmortgage_cost(i), en.can_unmortgage(me, i)],
+		["build", "+ Casa · Bs %d" % b.house_cost(i), en.can_build(me, i), UiKit.GOOD],
+		["sell_building", "− Casa · +Bs %d" % refund, en.can_sell_building(me, i), Color(0, 0, 0, 0)],
+		["mortgage", "Hipotecar · +Bs %d" % b.mortgage_value(i), en.can_mortgage(me, i), Color(0, 0, 0, 0)],
+		["unmortgage", "Levantar · Bs %d" % en.unmortgage_cost(i), en.can_unmortgage(me, i), UiKit.ACCENT],
 	]
 	for s in specs:
-		if not controller.board.is_street(i) and s[0] in ["build", "sell_building"]:
+		if not b.is_street(i) and s[0] in ["build", "sell_building"]:
 			continue
 		if s[0] == "mortgage" and en.is_mortgaged(i):
 			continue
 		if s[0] == "unmortgage" and not en.is_mortgaged(i):
 			continue
-		var b := UiKit.button(s[1], func(): _submit({"type": s[0], "player": me, "space": i}))
-		b.custom_minimum_size = Vector2(0, 38)
-		b.disabled = s[2] != "" or not (s[0] in legal)
-		b.tooltip_text = s[2]
-		row.add_child(b)
+		if s[0] == "sell_building" and en.houses_on(i) == 0:
+			continue
+		var btn := UiKit.small_button(s[1], func(): _submit({"type": s[0], "player": me, "space": i}), s[3])
+		btn.disabled = s[2] != "" or not (s[0] in legal)
+		btn.tooltip_text = s[2]
+		row.add_child(btn)
 
 
 func _show_manager() -> void:
@@ -688,31 +698,51 @@ func _show_manager() -> void:
 	if me < 0:
 		_close_modal()
 		return
-	var v := UiKit.vbox(6)
-	v.custom_minimum_size = Vector2(minf(640, get_viewport_rect().size.x - 40), 0)
-	v.add_child(UiKit.label("Mis propiedades — efectivo Bs %d" % int(en.player(me)["cash"]), 22, UiKit.HEADING))
+	var vw := get_viewport_rect().size
+	var v := UiKit.vbox(10)
+	v.custom_minimum_size = Vector2(minf(680, vw.x - 48), 0)
+	var head := UiKit.hbox(10)
+	var title := UiKit.label("Mis propiedades", 24, UiKit.HEADING)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	head.add_child(UiKit.chip("Efectivo Bs %d" % int(en.player(me)["cash"]), UiKit.GOLD))
+	v.add_child(head)
 	var sc := ScrollContainer.new()
-	sc.custom_minimum_size = Vector2(0, minf(440, get_viewport_rect().size.y - 220))
-	var list := UiKit.vbox(6)
+	sc.custom_minimum_size = Vector2(0, minf(460, vw.y - 230))
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var list := UiKit.vbox(8)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(list)
 	v.add_child(sc)
 	for i in en.properties_of(me):
-		var row := UiKit.hbox(8)
-		row.add_child(UiKit.swatch(controller.board.space_color(i), Vector2(10, 34)))
+		var card := PanelContainer.new()
+		var tint := controller.board.space_color(i)
+		var sb := UiKit.box(Color.WHITE, 16, 14, 10, UiKit.LINE, 2)
+		sb.border_width_left = 8
+		sb.border_color = tint
+		card.add_theme_stylebox_override("panel", sb)
+		var col := UiKit.vbox(6)
+		card.add_child(col)
+		var top := UiKit.hbox(8)
+		var name_l := UiKit.label(_space_name(i), 18, UiKit.HEADING)
+		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_l.clip_text = true
+		top.add_child(name_l)
 		var h := en.houses_on(i)
-		var info := _space_name(i)
 		if h == GameEngine.HOTEL:
-			info += " · hotel"
+			top.add_child(UiKit.chip("Hotel", UiKit.DANGER))
 		elif h > 0:
-			info += " · %d casa%s" % [h, "" if h == 1 else "s"]
+			top.add_child(UiKit.chip("%d casa%s" % [h, "" if h == 1 else "s"], UiKit.GOOD))
 		if en.is_mortgaged(i):
-			info += " · hipotecada"
-		var l := UiKit.label(info, 16)
-		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(l)
-		_manage_buttons(row, me, i)
-		list.add_child(row)
+			top.add_child(UiKit.chip("Hipotecada", UiKit.SOFT))
+		col.add_child(top)
+		var buttons := HFlowContainer.new()
+		buttons.alignment = FlowContainer.ALIGNMENT_END
+		buttons.add_theme_constant_override("h_separation", 6)
+		buttons.add_theme_constant_override("v_separation", 6)
+		_manage_buttons(buttons, me, i)
+		col.add_child(buttons)
+		list.add_child(card)
 	v.add_child(UiKit.button("Cerrar", _close_modal))
 	_open_modal(UiKit.panel(v), "manager", -1)
 

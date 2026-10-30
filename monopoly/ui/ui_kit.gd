@@ -140,6 +140,28 @@ static func button(text: String, cb: Callable, accent: bool = false, color: Colo
 	return b
 
 
+## Botón compacto para listas (alto 44 px, texto 16): nunca recorta su texto.
+static func small_button(text: String, cb: Callable, color: Color = Color(0, 0, 0, 0)) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, 44)
+	b.add_theme_font_size_override("font_size", 16)
+	var fill := color if color.a > 0 else PANEL
+	var fg := NAVY if fill.get_luminance() > 0.55 else Color.WHITE
+	b.add_theme_stylebox_override("normal", box(fill, 18, 14, 6, LINE if color.a == 0 else Color(0, 0, 0, 0), 2))
+	b.add_theme_stylebox_override("hover", box(fill.lightened(0.08), 18, 14, 6, ACCENT, 2))
+	b.add_theme_stylebox_override("pressed", box(fill.darkened(0.08), 18, 14, 6, ACCENT, 2))
+	b.add_theme_stylebox_override("disabled", box(SOFT, 18, 14, 6))
+	for c in ["font_color", "font_hover_color", "font_pressed_color"]:
+		b.add_theme_color_override(c, fg)
+	make_lively(b)
+	b.pressed.connect(func():
+		Sfx.play("click")
+		cb.call())
+	return b
+
+
 ## Hace que un control reaccione: crece al pasar el cursor y rebota al presionar.
 static func make_lively(c: Control) -> void:
 	c.mouse_entered.connect(func(): _scale_to(c, 1.04, 0.12))
