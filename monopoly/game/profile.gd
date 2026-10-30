@@ -1,0 +1,76 @@
+extends Node
+## Autoload "Profile": identidad local del jugador (sin autenticación) y ajustes.
+## El UUID se genera una vez por dispositivo y sirve para reconectar a partidas en red.
+
+const PATH := "user://profile.cfg"
+const COLORS := ["#e04848", "#3d7be0", "#3fb36b", "#f0b429", "#9b59d0", "#ef7d3c", "#1fb5b5", "#e05aa8"]
+const TOKEN_NAMES := {
+	"llama": "Llama", "charango": "Charango", "cabina": "Cabina", "bombin": "Bombín",
+	"ekeko": "Ekeko", "zampona": "Zampoña", "condor": "Cóndor", "trompo": "Trompo",
+}
+
+var uuid := ""
+var display_name := "Jugador"
+var nick := ""
+var token := "llama"
+var color := COLORS[0]
+var view_mode := "3d"          # "3d" | "2d"
+var music_volume := 0.5
+var sfx_volume := 0.8
+var last_host := ""
+var rules: Dictionary = {}
+
+
+func _ready() -> void:
+	load_profile()
+
+
+func load_profile() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(PATH) == OK:
+		uuid = cfg.get_value("profile", "uuid", "")
+		display_name = cfg.get_value("profile", "name", display_name)
+		nick = cfg.get_value("profile", "nick", nick)
+		token = cfg.get_value("profile", "token", token)
+		color = cfg.get_value("profile", "color", color)
+		view_mode = cfg.get_value("settings", "view_mode", view_mode)
+		music_volume = cfg.get_value("settings", "music_volume", music_volume)
+		sfx_volume = cfg.get_value("settings", "sfx_volume", sfx_volume)
+		last_host = cfg.get_value("settings", "last_host", last_host)
+		rules = cfg.get_value("settings", "rules", rules)
+	if uuid == "":
+		uuid = _new_uuid()
+		save_profile()
+
+
+func save_profile() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("profile", "uuid", uuid)
+	cfg.set_value("profile", "name", display_name)
+	cfg.set_value("profile", "nick", nick)
+	cfg.set_value("profile", "token", token)
+	cfg.set_value("profile", "color", color)
+	cfg.set_value("settings", "view_mode", view_mode)
+	cfg.set_value("settings", "music_volume", music_volume)
+	cfg.set_value("settings", "sfx_volume", sfx_volume)
+	cfg.set_value("settings", "last_host", last_host)
+	cfg.set_value("settings", "rules", rules)
+	cfg.save(PATH)
+
+
+func as_seat() -> Dictionary:
+	return {"uuid": uuid, "name": display_name, "nick": nick, "token": token, "color": color, "ai": -1}
+
+
+static func label_for(p: Dictionary) -> String:
+	var nk: String = p.get("nick", "")
+	return p["name"] if nk == "" else "%s «%s»" % [p["name"], nk]
+
+
+func _new_uuid() -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var hex := ""
+	for i in 16:
+		hex += "%02x" % rng.randi_range(0, 255)
+	return "%s-%s-%s-%s-%s" % [hex.substr(0, 8), hex.substr(8, 4), hex.substr(12, 4), hex.substr(16, 4), hex.substr(20, 12)]

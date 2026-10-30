@@ -1,0 +1,672 @@
+{
+ "name": "La Paz – El Alto",
+ "salary": 200,
+ "start_cash": 1500,
+ "jail_fine": 50,
+ "houses_total": 32,
+ "hotels_total": 12,
+ "groups": {
+  "cafe": {
+   "color": "#7a4a2a",
+   "house": 50
+  },
+  "celeste": {
+   "color": "#7fc8e8",
+   "house": 50
+  },
+  "rosa": {
+   "color": "#d0559a",
+   "house": 100
+  },
+  "naranja": {
+   "color": "#f08a24",
+   "house": 100
+  },
+  "rojo": {
+   "color": "#d6332e",
+   "house": 150
+  },
+  "amarillo": {
+   "color": "#f2cf2f",
+   "house": 150
+  },
+  "verde": {
+   "color": "#2f9e55",
+   "house": 200
+  },
+  "azul": {
+   "color": "#2a4fb0",
+   "house": 200
+  }
+ },
+ "spaces": [
+  {
+   "type": "go",
+   "name": "Salida"
+  },
+  {
+   "type": "street",
+   "name": "Villa Fátima",
+   "group": "cafe",
+   "price": 60,
+   "house_cost": 50,
+   "rents": [
+    4,
+    20,
+    60,
+    160,
+    208,
+    260
+   ]
+  },
+  {
+   "type": "card",
+   "name": "Cabildo",
+   "deck": "cabildo"
+  },
+  {
+   "type": "street",
+   "name": "Achachicala",
+   "group": "cafe",
+   "price": 70,
+   "house_cost": 50,
+   "rents": [
+    5,
+    25,
+    75,
+    200,
+    260,
+    325
+   ]
+  },
+  {
+   "type": "transit",
+   "name": "Teleférico Rojo",
+   "group": "teleferico",
+   "price": 200,
+   "rents": [
+    25,
+    50,
+    100,
+    200
+   ]
+  },
+  {
+   "type": "tax",
+   "name": "Tasa Municipal",
+   "amount": 100
+  },
+  {
+   "type": "street",
+   "name": "Chasquipampa",
+   "group": "celeste",
+   "price": 100,
+   "house_cost": 50,
+   "rents": [
+    7,
+    35,
+    105,
+    280,
+    364,
+    455
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Obrajes",
+   "group": "celeste",
+   "price": 100,
+   "house_cost": 50,
+   "rents": [
+    7,
+    35,
+    105,
+    280,
+    364,
+    455
+   ]
+  },
+  {
+   "type": "card",
+   "name": "Destino",
+   "deck": "destino"
+  },
+  {
+   "type": "street",
+   "name": "Irpavi",
+   "group": "celeste",
+   "price": 120,
+   "house_cost": 50,
+   "rents": [
+    8,
+    40,
+    120,
+    320,
+    416,
+    520
+   ]
+  },
+  {
+   "type": "jail",
+   "name": "Retén"
+  },
+  {
+   "type": "street",
+   "name": "Miraflores",
+   "group": "rosa",
+   "price": 140,
+   "house_cost": 100,
+   "rents": [
+    10,
+    50,
+    150,
+    400,
+    520,
+    650
+   ]
+  },
+  {
+   "type": "utility",
+   "name": "Empresa de Luz",
+   "group": "servicio",
+   "price": 150,
+   "multipliers": [
+    4,
+    10
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Sopocachi",
+   "group": "rosa",
+   "price": 140,
+   "house_cost": 100,
+   "rents": [
+    10,
+    50,
+    150,
+    400,
+    520,
+    650
+   ]
+  },
+  {
+   "type": "street",
+   "name": "San Pedro",
+   "group": "rosa",
+   "price": 160,
+   "house_cost": 100,
+   "rents": [
+    11,
+    55,
+    165,
+    440,
+    572,
+    715
+   ]
+  },
+  {
+   "type": "transit",
+   "name": "Teleférico Amarillo",
+   "group": "teleferico",
+   "price": 200,
+   "rents": [
+    25,
+    50,
+    100,
+    200
+   ]
+  },
+  {
+   "type": "card",
+   "name": "Cabildo",
+   "deck": "cabildo"
+  },
+  {
+   "type": "street",
+   "name": "Calacoto",
+   "group": "naranja",
+   "price": 180,
+   "house_cost": 100,
+   "rents": [
+    13,
+    65,
+    195,
+    520,
+    676,
+    845
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Achumani",
+   "group": "naranja",
+   "price": 180,
+   "house_cost": 100,
+   "rents": [
+    13,
+    65,
+    195,
+    520,
+    676,
+    845
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Los Pinos",
+   "group": "naranja",
+   "price": 200,
+   "house_cost": 100,
+   "rents": [
+    14,
+    70,
+    210,
+    560,
+    728,
+    910
+   ]
+  },
+  {
+   "type": "free",
+   "name": "Mirador"
+  },
+  {
+   "type": "street",
+   "name": "El Prado",
+   "group": "rojo",
+   "price": 220,
+   "house_cost": 150,
+   "rents": [
+    15,
+    75,
+    225,
+    600,
+    780,
+    975
+   ]
+  },
+  {
+   "type": "card",
+   "name": "Destino",
+   "deck": "destino"
+  },
+  {
+   "type": "street",
+   "name": "Av. Camacho",
+   "group": "rojo",
+   "price": 220,
+   "house_cost": 150,
+   "rents": [
+    15,
+    75,
+    225,
+    600,
+    780,
+    975
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Plaza Murillo",
+   "group": "rojo",
+   "price": 240,
+   "house_cost": 150,
+   "rents": [
+    17,
+    85,
+    255,
+    680,
+    884,
+    1105
+   ]
+  },
+  {
+   "type": "transit",
+   "name": "Teleférico Verde",
+   "group": "teleferico",
+   "price": 200,
+   "rents": [
+    25,
+    50,
+    100,
+    200
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Ciudad Satélite",
+   "group": "amarillo",
+   "price": 260,
+   "house_cost": 150,
+   "rents": [
+    18,
+    90,
+    270,
+    720,
+    936,
+    1170
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Villa Adela",
+   "group": "amarillo",
+   "price": 260,
+   "house_cost": 150,
+   "rents": [
+    18,
+    90,
+    270,
+    720,
+    936,
+    1170
+   ]
+  },
+  {
+   "type": "utility",
+   "name": "Empresa de Agua",
+   "group": "servicio",
+   "price": 150,
+   "multipliers": [
+    4,
+    10
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Ceja de El Alto",
+   "group": "amarillo",
+   "price": 280,
+   "house_cost": 150,
+   "rents": [
+    20,
+    100,
+    300,
+    800,
+    1040,
+    1300
+   ]
+  },
+  {
+   "type": "gotojail",
+   "name": "¡Al Retén!"
+  },
+  {
+   "type": "street",
+   "name": "Uyuni",
+   "group": "verde",
+   "price": 300,
+   "house_cost": 200,
+   "rents": [
+    21,
+    105,
+    315,
+    840,
+    1092,
+    1365
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Tiwanaku",
+   "group": "verde",
+   "price": 300,
+   "house_cost": 200,
+   "rents": [
+    21,
+    105,
+    315,
+    840,
+    1092,
+    1365
+   ]
+  },
+  {
+   "type": "card",
+   "name": "Cabildo",
+   "deck": "cabildo"
+  },
+  {
+   "type": "street",
+   "name": "Copacabana",
+   "group": "verde",
+   "price": 320,
+   "house_cost": 200,
+   "rents": [
+    22,
+    110,
+    330,
+    880,
+    1144,
+    1430
+   ]
+  },
+  {
+   "type": "transit",
+   "name": "Teleférico Azul",
+   "group": "teleferico",
+   "price": 200,
+   "rents": [
+    25,
+    50,
+    100,
+    200
+   ]
+  },
+  {
+   "type": "card",
+   "name": "Destino",
+   "deck": "destino"
+  },
+  {
+   "type": "tax",
+   "name": "Impuesto al Lujo",
+   "amount": 120
+  },
+  {
+   "type": "street",
+   "name": "Zona Sur",
+   "group": "azul",
+   "price": 350,
+   "house_cost": 200,
+   "rents": [
+    25,
+    125,
+    375,
+    1000,
+    1300,
+    1625
+   ]
+  },
+  {
+   "type": "street",
+   "name": "Illimani Resort",
+   "group": "azul",
+   "price": 400,
+   "house_cost": 200,
+   "rents": [
+    28,
+    140,
+    420,
+    1120,
+    1456,
+    1820
+   ]
+  }
+ ],
+ "decks": {
+  "destino": [
+   {
+    "text": "Avanza hasta la Salida y cobra tu sueldo.",
+    "action": "move_to",
+    "target": 0
+   },
+   {
+    "text": "Te invitan a un acto en Plaza Murillo. Avanza hasta allí.",
+    "action": "move_to",
+    "target": 24
+   },
+   {
+    "text": "Fin de semana en Illimani Resort. Avanza hasta allí.",
+    "action": "move_to",
+    "target": 39
+   },
+   {
+    "text": "Viaje cultural: avanza hasta Tiwanaku.",
+    "action": "move_to",
+    "target": 32
+   },
+   {
+    "text": "Sube al teleférico más cercano.",
+    "action": "nearest",
+    "kind": "transit"
+   },
+   {
+    "text": "Corte de suministro: avanza al servicio más cercano.",
+    "action": "nearest",
+    "kind": "utility"
+   },
+   {
+    "text": "Te equivocaste de minibús. Retrocede 3 casillas.",
+    "action": "move_rel",
+    "steps": -3
+   },
+   {
+    "text": "Operativo de tránsito. ¡Al Retén! Sin pasar por la Salida.",
+    "action": "jail"
+   },
+   {
+    "text": "Salvoconducto: sal libre del Retén. Guárdala.",
+    "action": "jail_free"
+   },
+   {
+    "text": "Ganaste el concurso de morenada. Cobra $100.",
+    "action": "money",
+    "amount": 100
+   },
+   {
+    "text": "Dividendos de tu tienda en la Eloy Salmón. Cobra $50.",
+    "action": "money",
+    "amount": 50
+   },
+   {
+    "text": "Préstamo cooperativo liberado. Cobra $150.",
+    "action": "money",
+    "amount": 150
+   },
+   {
+    "text": "Multa por estacionar en doble fila. Paga $15.",
+    "action": "money",
+    "amount": -15
+   },
+   {
+    "text": "Mantenimiento de tus inmuebles: $25 por casa y $100 por hotel.",
+    "action": "repairs",
+    "house": 25,
+    "hotel": 100
+   },
+   {
+    "text": "Te eligieron preste de la fiesta. Paga $50 a cada jugador.",
+    "action": "pay_each",
+    "amount": 50
+   },
+   {
+    "text": "Granizada en la ciudad: arreglos de techo. Paga $40.",
+    "action": "money",
+    "amount": -40
+   }
+  ],
+  "cabildo": [
+   {
+    "text": "Bono del Cabildo vecinal. Cobra $200.",
+    "action": "money",
+    "amount": 200
+   },
+   {
+    "text": "Consulta médica. Paga $100.",
+    "action": "money",
+    "amount": -100
+   },
+   {
+    "text": "Vendiste miniaturas en la Feria de Alasitas. Cobra $100.",
+    "action": "money",
+    "amount": 100
+   },
+   {
+    "text": "¡Es tu cumpleaños! Cobra $10 de cada jugador.",
+    "action": "collect_each",
+    "amount": 10
+   },
+   {
+    "text": "Venció tu seguro de vida. Cobra $100.",
+    "action": "money",
+    "amount": 100
+   },
+   {
+    "text": "Salvoconducto: sal libre del Retén. Guárdala.",
+    "action": "jail_free"
+   },
+   {
+    "text": "Denuncia vecinal. ¡Al Retén! Sin pasar por la Salida.",
+    "action": "jail"
+   },
+   {
+    "text": "Avanza hasta la Salida y cobra tu sueldo.",
+    "action": "move_to",
+    "target": 0
+   },
+   {
+    "text": "Herencia de tu tía de Oruro. Cobra $100.",
+    "action": "money",
+    "amount": 100
+   },
+   {
+    "text": "Matrícula del colegio. Paga $50.",
+    "action": "money",
+    "amount": -50
+   },
+   {
+    "text": "Asesoría a la junta vecinal. Cobra $25.",
+    "action": "money",
+    "amount": 25
+   },
+   {
+    "text": "Arreglo de calles del barrio: $40 por casa y $115 por hotel.",
+    "action": "repairs",
+    "house": 40,
+    "hotel": 115
+   },
+   {
+    "text": "Devolución de impuestos. Cobra $20.",
+    "action": "money",
+    "amount": 20
+   },
+   {
+    "text": "Premio de comparsa en el Gran Poder. Cobra $10.",
+    "action": "money",
+    "amount": 10
+   },
+   {
+    "text": "Vendiste acciones. Cobra $50.",
+    "action": "money",
+    "amount": 50
+   },
+   {
+    "text": "Papeleta de tránsito. Paga $50.",
+    "action": "money",
+    "amount": -50
+   }
+  ]
+ },
+ "tokens": [
+  "llama",
+  "charango",
+  "cabina",
+  "bombin",
+  "ekeko",
+  "zampona",
+  "condor",
+  "trompo"
+ ]
+}
