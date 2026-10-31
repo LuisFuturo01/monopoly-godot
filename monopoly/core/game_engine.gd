@@ -1041,6 +1041,7 @@ func _game_over(reason: String) -> void:
 			best_worth = w
 			best = pid
 	s["winner"] = best
+	s["end_reason"] = reason
 	s["auction_queue"] = []
 	s["phase"] = GAME_OVER
 	var ranking := []

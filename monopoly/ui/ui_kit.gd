@@ -24,6 +24,7 @@ const CABILDO := Color("#3d7be0")    # cartas y casillas de Cabildo
 const PLACES_DIR := "res://data/places/"
 
 static var _theme: Theme
+static var _photos: Dictionary = {}
 static var _font: SystemFont
 static var _font_black: SystemFont
 
@@ -255,13 +256,30 @@ static func chip(text: String, color: Color) -> PanelContainer:
 	return p
 
 
-## Foto del lugar (data/places/<i>.jpg) o null si no hay.
-static func place_photo(i: int) -> Texture2D:
-	for ext in [".jpg", ".png"]:
-		var path: String = PLACES_DIR + str(i) + ext
-		if ResourceLoader.exists(path):
-			return load(path)
-	return null
+## Nombre de archivo de la foto de una casilla: «23_av_camacho» (ver data/places/LEEME.md).
+static func place_file(i: int, name: String) -> String:
+	var s := name.to_lower()
+	for pair in [["á", "a"], ["é", "e"], ["í", "i"], ["ó", "o"], ["ú", "u"], ["ü", "u"], ["ñ", "n"]]:
+		s = s.replace(pair[0], pair[1])
+	var out := ""
+	for c in s:
+		out += c if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") else "_"
+	while out.contains("__"):
+		out = out.replace("__", "_")
+	return "%02d_%s" % [i, out.trim_prefix("_").trim_suffix("_")]
+
+
+## Foto del lugar (data/places/NN_nombre.jpg o .png) o null si no hay.
+static func place_photo(i: int, name: String) -> Texture2D:
+	var key := place_file(i, name)
+	if not _photos.has(key):
+		_photos[key] = null
+		for ext in [".jpg", ".png"]:
+			var path: String = PLACES_DIR + key + ext
+			if ResourceLoader.exists(path):
+				_photos[key] = load(path)
+				break
+	return _photos[key]
 
 
 ## Degradado diagonal entre dos colores (fondos de tarjetas sin foto).

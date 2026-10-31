@@ -30,6 +30,7 @@ var _last_local_actor := -1
 var _game_over_shown := false
 var _deed_back: Dictionary = {}      # casilla -> la tarjeta muestra el dorso
 var _banners := 0                    # avisos grandes visibles (para apilarlos)
+var _warned_round := -1
 
 
 func setup(c: GameController, view2d: BoardView2D, view3d: BoardView3D) -> void:
@@ -322,6 +323,9 @@ func _refresh_actions() -> void:
 			text += "  (pensando…)"
 		elif controller.networked:
 			text += "  (en otro dispositivo)"
+	var limit := e().rules.max_rounds
+	if limit > 0:
+		text += "  ·  Ronda %d de %d" % [mini(int(en.s["round"]), limit), limit]
 	_status.text = text
 	if local < 0 or controller.is_busy():
 		return
@@ -833,6 +837,12 @@ func _show_game_over() -> void:
 	var title := UiKit.label("¡%s gana!" % _plain(w) if w >= 0 else "Fin de la partida", 30, UiKit.HEADING)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
+	var why := {"rounds": "Se cumplió el límite de %d rondas: gana el mayor patrimonio." % en.rules.max_rounds,
+		"bankruptcy": "Todos los demás quebraron." if en.active_players().size() <= 1 else "Final rápido: terminó con la primera quiebra; gana el mayor patrimonio."}
+	var reason := UiKit.label(why.get(String(en.s.get("end_reason", "")), ""), 15, UiKit.MUTED, true)
+	reason.custom_minimum_size.x = 400
+	reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(reason)
 	var ranking := []
 	for p in en.players():
 		ranking.append({"p": p, "worth": 0 if p["bankrupt"] else en.net_worth(int(p["id"]))})
@@ -1046,7 +1056,7 @@ func _deed(i: int) -> Control:
 	var front := UiKit.vbox(0)
 	front.custom_minimum_size.x = width
 	var photo := TextureRect.new()
-	var tex := UiKit.place_photo(i)
+	var tex := UiKit.place_photo(i, sp["name"])
 	photo.texture = tex if tex else UiKit.gradient_tex(col.lightened(0.3), col.darkened(0.3))
 	photo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -1524,5 +1534,11 @@ func _animate_event(ev: Dictionary) -> void:
 			_banner("¡Quiebra!", _plain(int(ev["player"])), UiKit.DANGER)
 		"pot_collected":
 			_banner("¡Bote!", "%s se lleva Bs %d" % [_plain(int(ev["player"])), int(ev["amount"])], UiKit.GOLD)
+		"turn_started":
+			var limit := e().rules.max_rounds
+			var rnd := int(ev.get("round", 0))
+			if limit > 0 and rnd >= limit - 2 and rnd != _warned_round:
+				_warned_round = rnd
+				_banner("¡Última ronda!" if rnd == limit else "Quedan %d rondas" % (limit - rnd + 1), "Al terminar gana el mayor patrimonio", UiKit.CORAL)
 		"connection":
 			_banner("Conectado" if ev["connected"] else "Desconectado", _plain(int(ev["player"])), UiKit.ACCENT_2 if ev["connected"] else UiKit.MUTED)

@@ -1,6 +1,7 @@
 class_name GameAudio
 extends Node
-## Traduce los eventos del juego a efectos de sonido, sincronizados con las animaciones.
+## Traduce los eventos del juego a efectos de sonido y a frases del locutor,
+## sincronizados con las animaciones.
 
 var controller: GameController
 
@@ -11,6 +12,7 @@ func bind(c: GameController) -> void:
 
 
 func _on_event(ev: Dictionary) -> void:
+	_announce(ev)
 	match ev["type"]:
 		"dice_rolled":
 			Sfx.play("dice_roll", 0.05)
@@ -68,3 +70,65 @@ func _on_event(ev: Dictionary) -> void:
 			Sfx.play("win")
 		"debt":
 			Sfx.play("alert")
+
+
+## Locutor: dice el resultado de los dados y lo importante de cada jugada.
+func _announce(ev: Dictionary) -> void:
+	match ev["type"]:
+		"dice_rolled":
+			var d: Array = ev["dice"]
+			Sfx.say("dice_%d" % (int(d[0]) + int(d[1])), EventPlayer.DICE_TIME * 0.9)
+			if ev["double"]:
+				Sfx.say("doubles", EventPlayer.DICE_TIME * 0.95)
+		"bought":
+			Sfx.say("bought_%d" % int(ev["space"]))
+		"mortgaged":
+			Sfx.say("mortgaged_%d" % int(ev["space"]))
+		"unmortgaged":
+			Sfx.say("unmortgaged_%d" % int(ev["space"]))
+		"sold_building":
+			Sfx.say("sold_%d" % int(ev["space"]))
+		"built":
+			Sfx.say(("hotel_%d" if int(ev.get("houses", 0)) == GameEngine.HOTEL else "house_%d") % int(ev["space"]))
+		"auction_started":
+			Sfx.say("auction_%d" % int(ev["space"]))
+		"auction_ended":
+			Sfx.say("auction_sold" if int(ev["winner"]) >= 0 else "no_buyer")
+		"rent_due":
+			Sfx.say("rent_%d" % int(ev["space"]) if ev.has("space") else "tax")
+		"tax_due":
+			Sfx.say("tax")
+		"money":
+			if ev["reason"] == "Sueldo":
+				Sfx.say("salary")
+		"card_drawn":
+			Sfx.say("destino" if ev["deck"] == "destino" else "cabildo")
+		"three_doubles":
+			Sfx.say("three_doubles")
+		"jailed":
+			Sfx.say("jail")
+		"jail_released":
+			Sfx.say("jail_free")
+		"trade_proposed":
+			if controller.is_local_human(int(ev["to"])):
+				Sfx.say("trade_offer")
+		"trade_resolved":
+			if ev["result"] == "accepted":
+				Sfx.say("trade_ok")
+			elif ev["result"] == "rejected":
+				Sfx.say("trade_no")
+		"bankrupt":
+			Sfx.say("bankrupt")
+		"pot_collected":
+			Sfx.say("pot")
+		"debt":
+			if controller.is_local_human(int(ev["debtor"])):
+				Sfx.say("debt")
+		"turn_started":
+			var limit := controller.engine.rules.max_rounds
+			if limit > 0 and int(ev.get("round", 0)) == limit and int(ev["player"]) == controller.engine.active_players()[0]:
+				Sfx.say("last_round")
+			elif controller.is_local_human(int(ev["player"])):
+				Sfx.say("your_turn")
+		"game_over":
+			Sfx.say("win")

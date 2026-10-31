@@ -578,6 +578,11 @@ func _rules_editor(r: RulesConfig, on_change: Callable, editable: bool) -> Contr
 	rounds_box.add_child(UiKit.label("Duración de la partida", 17, UiKit.HEADING))
 	var opts := [0, 30, 60, 100]
 	var labels := ["Sin límite", "30 rondas", "60 rondas", "100 rondas"]
+	# Un límite guardado por una versión anterior (p. ej. 50) se muestra tal cual:
+	# antes aparecía como «Sin límite» y la partida terminaba sin aviso.
+	if r.max_rounds > 0 and not r.max_rounds in opts:
+		opts.append(r.max_rounds)
+		labels.append("%d rondas" % r.max_rounds)
 	var current := opts.find(r.max_rounds)
 	if not editable:
 		rounds_box.add_child(UiKit.label(labels[maxi(current, 0)], 16, UiKit.MUTED))

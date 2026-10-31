@@ -18,6 +18,8 @@ func _init() -> void:
 		"test_buy_rent_and_monopoly_double",
 		"test_decline_starts_auction",
 		"test_mortgage_during_auction",
+		"test_unlimited_rounds_end_only_by_bankruptcy",
+		"test_round_limit_ends_game",
 		"test_auction_nobody_bids",
 		"test_even_building_and_hotel",
 		"test_quick_mode_hotel_after_three",
@@ -466,6 +468,49 @@ func test_ai_simulation() -> void:
 				winners_by_level[int(e.player(w)["ai"])] += 1
 	print("  %d/%d partidas terminadas, %d comandos; victorias por nivel F/M/D: %s" % [finished, games, total_cmds, winners_by_level])
 	check(finished == games, "todas las partidas terminan")
+
+
+## Con rondas ilimitadas y sin «final rápido» la partida solo termina con un único sobreviviente.
+func test_unlimited_rounds_end_only_by_bankruptcy() -> void:
+	print("test_unlimited_rounds_end_only_by_bankruptcy")
+	var ai := AiBrain.new(7)
+	var ended_early := 0
+	var finished := 0
+	for g in 12:
+		var e := GameEngine.new(board, RulesConfig.classic())
+		var seats := []
+		for k in 3:
+			seats.append({"name": "J%d" % k, "ai": (k + g) % 3})
+		e.new_game(seats, 500 + g)
+		var cmds := 0
+		while not e.is_over() and cmds < 60000:
+			var pid := e.pending_actor()
+			if not e.apply(ai.decide(e, pid, int(e.player(pid)["ai"])))["ok"]:
+				break
+			cmds += 1
+		if e.is_over():
+			finished += 1
+			if e.active_players().size() != 1:
+				ended_early += 1
+	print("  %d/12 terminadas" % finished)
+	check(ended_early == 0, "ninguna partida ilimitada termina con más de un jugador activo")
+
+
+func test_round_limit_ends_game() -> void:
+	print("test_round_limit_ends_game")
+	var r := RulesConfig.classic()
+	r.max_rounds = 2
+	var e := GameEngine.new(board, r)
+	e.new_game([{"name": "A", "ai": 1}, {"name": "B", "ai": 1}, {"name": "C", "ai": 1}], 3)
+	var ai := AiBrain.new(3)
+	var cmds := 0
+	while not e.is_over() and cmds < 5000:
+		var pid := e.pending_actor()
+		e.apply(ai.decide(e, pid, 1))
+		cmds += 1
+	check(e.is_over() and e.s.get("end_reason", "") == "rounds", "el límite de rondas termina la partida e informa el motivo")
+	var rr := RulesConfig.from_dict({"max_rounds": 50})
+	check(rr.max_rounds == 50, "un límite guardado se respeta (la pantalla de reglas ahora lo muestra)")
 
 
 func _invariants(e: GameEngine) -> bool:

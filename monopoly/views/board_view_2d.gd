@@ -31,6 +31,7 @@ var _pop: Dictionary = {}           # casilla -> progreso 0..1 de la obra
 var _font_black: Font
 var _sb := StyleBoxFlat.new()
 var _time := 0.0
+var _badge: Texture2D = preload("res://branding/splash_round.png")
 
 
 func _ready() -> void:
@@ -245,11 +246,20 @@ func _draw_space(i: int) -> void:
 		_draw_buildings(i, band)
 		y = band.end.y + 2.0
 	var title: String = sp["name"]
+	var photo := UiKit.place_photo(i, title)
 	if corner:
+		if photo:
+			_photo_rect(photo, box.grow(-3))
+			_rbox(box.grow(-3), Color(1, 1, 1, 0.55), 3)
 		_draw_corner(i, sp, lw, lh)
+	elif photo:
+		var ph := Rect2(-lw / 2 + 4, y + 2, lw - 8, lh * 0.36)
+		_photo_rect(photo, ph)
+		draw_multiline_string(_font_black, Vector2(-lw / 2 + 2, ph.end.y + fs + 1), title.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, lw - 4, fs, 2, INK)
 	else:
-		draw_multiline_string(_font, Vector2(-lw / 2 + 2, y + fs), title.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, lw - 4, fs, 3, INK)
-		var icon := _icon_for(sp)
+		draw_multiline_string(_font_black, Vector2(-lw / 2 + 2, y + fs), title.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, lw - 4, fs, 3, INK)
+	if not corner:
+		var icon := "" if photo else _icon_for(sp)
 		if icon != "":
 			var icol := Color.WHITE if sp["type"] == "card" else INK.lerp(PAPER, 0.25)
 			draw_string(_font_black, Vector2(-lw / 2, lh * 0.14 + fs), icon, HORIZONTAL_ALIGNMENT_CENTER, lw, int(fs * 2.1), icol)
@@ -282,6 +292,22 @@ func _draw_space(i: int) -> void:
 		_rbox(box.grow(-1.5), Color(0, 0, 0, 0), 5, Color(1.0, 0.82, 0.1, pulse), 4)
 
 
+## Dibuja la foto llenando el rectángulo con recorte centrado (sin deformarla) y un borde blanco.
+func _photo_rect(tex: Texture2D, r: Rect2) -> void:
+	var tw := float(tex.get_width())
+	var th := float(tex.get_height())
+	var want := r.size.x / maxf(1.0, r.size.y)
+	var src := Rect2(0, 0, tw, th)
+	if tw / th > want:
+		src.size.x = th * want
+		src.position.x = (tw - src.size.x) / 2.0
+	else:
+		src.size.y = tw / want
+		src.position.y = (th - src.size.y) / 2.0
+	draw_texture_rect_region(tex, r, src)
+	draw_rect(r, Color.WHITE, false, 1.5)
+
+
 func _draw_corner(i: int, sp: Dictionary, lw: float, lh: float) -> void:
 	var fs := maxi(9, int(_scale * 0.22))
 	var labels := {"go": "SALIDA\ncobra Bs %d" % controller.board.salary, "jail": "RETÉN\nde visita", "free": "MIRADOR", "gotojail": "¡AL\nRETÉN!"}
@@ -298,7 +324,8 @@ func _icon_for(sp: Dictionary) -> String:
 		"transit":
 			return "[ T ]"
 		"utility":
-			return "( E )" if sp["name"].contains("Luz") else "( A )"
+			# La primera empresa de servicio es la de luz.
+			return "( E )" if sp["name"] == controller.board.space(12)["name"] else "( A )"
 		"card":
 			return "?" if sp["deck"] == "destino" else "!"
 		"tax":
@@ -331,24 +358,28 @@ func _draw_buildings(i: int, band: Rect2) -> void:
 		draw_polyline(body + PackedVector2Array([body[0]]), INK, 1.0)
 
 
+## Centro: la insignia de Luchopolis y los mazos en diagonal, cada uno en su esquina del paño
+## (antes el mazo de Cabildo tapaba el nombre).
 func _draw_center(board_px: float) -> void:
 	var c := _origin + Vector2(board_px, board_px) / 2.0
-	var fs := maxi(10, int(_scale * 0.8))
-	draw_set_transform(c, -PI / 4.0, Vector2.ONE)
-	draw_string(_font_black, Vector2(-board_px / 2 + 3, -fs * 0.2 + 4), "LUCHOPOLIS", HORIZONTAL_ALIGNMENT_CENTER, board_px, fs, Color(0, 0, 0, 0.3))
-	draw_string(_font_black, Vector2(-board_px / 2, -fs * 0.2), "LUCHOPOLIS", HORIZONTAL_ALIGNMENT_CENTER, board_px, fs, TRIM)
-	draw_string(_font, Vector2(-board_px / 2, fs * 0.65), controller.board.name, HORIZONTAL_ALIGNMENT_CENTER, board_px, maxi(7, int(fs * 0.35)), Color(1, 1, 1, 0.85))
-	draw_set_transform_matrix(Transform2D.IDENTITY)
-	# Mazos de Destino y Cabildo
-	var deck_size := Vector2(2.0, 1.3) * _scale
+	var side := _scale * 4.4
+	draw_circle(c + Vector2(0, -_scale * 0.5) + Vector2(4, 8), side * 0.47, Color(0, 0, 0, 0.25))
+	draw_texture_rect(_badge, Rect2(c + Vector2(-side / 2, -side / 2 - _scale * 0.5), Vector2(side, side)), false)
+	var deck_size := Vector2(2.1, 1.35) * _scale
 	for k in 2:
-		var pos := c + Vector2(-2.6 if k == 0 else 0.6, -3.4) * _scale
+		var dc := c + (Vector2(-3.2, -3.2) if k == 0 else Vector2(3.2, 3.2)) * _scale
 		var col := UiKit.DESTINO if k == 0 else UiKit.CABILDO
-		for layer in [2, 1]:
-			_rbox(Rect2(pos + Vector2(layer * 3, layer * 3), deck_size), col.darkened(0.25 + layer * 0.1), 8)
-		_rbox(Rect2(pos, deck_size), col, 8, Color.WHITE, 2)
-		draw_string(_font_black, pos + Vector2(0, deck_size.y * 0.5), "?" if k == 0 else "!", HORIZONTAL_ALIGNMENT_CENTER, deck_size.x, int(_scale * 0.5), Color.WHITE)
-		draw_string(_font_black, pos + Vector2(0, deck_size.y * 0.85), "DESTINO" if k == 0 else "CABILDO", HORIZONTAL_ALIGNMENT_CENTER, deck_size.x, maxi(7, int(_scale * 0.26)), Color.WHITE)
+		draw_set_transform(dc, -PI / 4.0, Vector2.ONE)
+		var r := Rect2(-deck_size / 2.0, deck_size)
+		for layer in [3, 2, 1]:
+			_rbox(Rect2(r.position + Vector2(layer * 2.5, layer * 2.5), deck_size), col.darkened(0.2 + layer * 0.08), 8)
+		_rbox(r, col, 8, Color.WHITE, 2)
+		draw_string(_font_black, r.position + Vector2(0, deck_size.y * 0.52), "?" if k == 0 else "!", HORIZONTAL_ALIGNMENT_CENTER, deck_size.x, int(_scale * 0.55), Color.WHITE)
+		draw_string(_font_black, r.position + Vector2(0, deck_size.y * 0.86), "DESTINO" if k == 0 else "CABILDO", HORIZONTAL_ALIGNMENT_CENTER, deck_size.x, maxi(8, int(_scale * 0.28)), Color.WHITE)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+	if controller.engine.rules.free_parking_pot and int(controller.engine.s["pot"]) > 0:
+		var pot := "Bote: Bs %d" % int(controller.engine.s["pot"])
+		draw_string(_font_black, c + Vector2(-board_px / 2, _scale * 2.15), pot, HORIZONTAL_ALIGNMENT_CENTER, board_px, maxi(9, int(_scale * 0.3)), TRIM)
 
 
 func _draw_tokens() -> void:
@@ -376,7 +407,7 @@ func _draw_tokens() -> void:
 
 
 func _draw_dice(board_px: float) -> void:
-	var c := _origin + Vector2(board_px, board_px) / 2.0 + Vector2(0, 2.4) * _scale
+	var c := _origin + Vector2(board_px, board_px) / 2.0 + Vector2(0, 2.95) * _scale
 	var d := _dice
 	if _dice_t >= 0.0 and _dice_t < EventPlayer.DICE_TIME * 0.8:
 		d = [_rng.randi_range(1, 6), _rng.randi_range(1, 6), d[2]]

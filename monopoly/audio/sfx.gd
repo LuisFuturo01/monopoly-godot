@@ -3,6 +3,8 @@ extends Node
 ## - Efectos: se sintetizan al arrancar en AudioStreamWAV.
 ## - Música: un bucle lo-fi jazz (ii-V-I-vi) se renderiza en un hilo y se transmite
 ##   con AudioStreamGenerator.
+## - Locutor: frases generadas con una voz neuronal (Kokoro, Apache-2.0) en
+##   audio/voice/<voz>/. Se dicen en cola, sin pisarse, y bajan un poco la música mientras suenan.
 
 const RATE := 22050
 const POOL_SIZE := 14
@@ -18,6 +20,11 @@ var _music_pos := 0
 var _thread: Thread
 var _rng := RandomNumberGenerator.new()
 var _mrng := RandomNumberGenerator.new()   # solo para el hilo de música
+var _voice: AudioStreamPlayer
+var _voice_queue: Array = []
+var _voice_cache: Dictionary = {}
+var _last_said := ""
+var _last_said_at := 0
 
 
 func _ready() -> void:
@@ -36,6 +43,10 @@ func _ready() -> void:
 	gen.buffer_length = 0.5
 	_music_player.stream = gen
 	add_child(_music_player)
+	_voice = AudioStreamPlayer.new()
+	_voice.bus = "Voice"
+	_voice.finished.connect(_next_voice)
+	add_child(_voice)
 	apply_volumes()
 	if DisplayServer.get_name() != "headless":
 		_thread = Thread.new()
@@ -50,6 +61,10 @@ func _exit_tree() -> void:
 func apply_volumes() -> void:
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(Profile.music_volume, 0.0001)) + MUSIC_BOOST_DB)
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(Profile.sfx_volume, 0.0001)))
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Voice"), linear_to_db(maxf(Profile.voice_volume, 0.0001)) + 3.0)
+	# Mientras habla el locutor la música baja para que se le entienda.
+	var duck := -9.0 if _voice and _voice.playing else 0.0
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(Profile.music_volume, 0.0001)) + MUSIC_BOOST_DB + duck)
 
 
 func play(sound: String, pitch_jitter: float = 0.0, volume_db: float = 0.0) -> void:
@@ -64,6 +79,49 @@ func play(sound: String, pitch_jitter: float = 0.0, volume_db: float = 0.0) -> v
 			return
 
 
+## Dice una frase del locutor (audio/voice/<voz>/<clave>.ogg). Si no existe, prueba `fallback`.
+## Las frases esperan su turno; si se acumulan, se descartan las más viejas para no
+## quedar atrasado respecto del juego.
+func say(key: String, delay: float = 0.0, fallback: String = "") -> void:
+	if Profile.voice_volume <= 0.01 or not is_inside_tree():
+		return
+	if delay > 0.0:
+		get_tree().create_timer(delay).timeout.connect(func(): say(key, 0.0, fallback))
+		return
+	if fallback != "" and _voice_stream(key) == null:
+		key = fallback
+	var now := Time.get_ticks_msec()
+	if key == _last_said and now - _last_said_at < 1500:
+		return
+	_last_said = key
+	_last_said_at = now
+	_voice_queue.append(key)
+	while _voice_queue.size() > 2:
+		_voice_queue.pop_front()
+	if not _voice.playing:
+		_next_voice()
+
+
+func _next_voice() -> void:
+	if _voice_queue.is_empty():
+		apply_volumes()
+		return
+	var stream := _voice_stream(_voice_queue.pop_front())
+	if stream == null:
+		_next_voice()
+		return
+	_voice.stream = stream
+	_voice.play()
+	apply_volumes()
+
+
+func _voice_stream(key: String) -> AudioStream:
+	var path := "res://audio/voice/%s/%s.ogg" % [Profile.voice_name, key]
+	if not _voice_cache.has(path):
+		_voice_cache[path] = load(path) if ResourceLoader.exists(path) else null
+	return _voice_cache[path]
+
+
 func play_later(sound: String, delay: float, pitch_jitter: float = 0.0) -> void:
 	if not is_inside_tree():
 		return
@@ -71,7 +129,7 @@ func play_later(sound: String, delay: float, pitch_jitter: float = 0.0) -> void:
 
 
 func _setup_buses() -> void:
-	for bus_name in ["Music", "SFX"]:
+	for bus_name in ["Music", "SFX", "Voice"]:
 		if AudioServer.get_bus_index(bus_name) == -1:
 			AudioServer.add_bus()
 			var idx := AudioServer.bus_count - 1

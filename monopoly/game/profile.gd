@@ -19,6 +19,8 @@ var color := COLORS[0]
 var view_mode := "3d"          # "3d" | "2d"
 var music_volume := 0.5
 var sfx_volume := 0.8
+var voice_volume := 0.9        # locutor (0 = sin voz)
+var voice_name := "ef_dora"    # carpeta en audio/voice/: ef_dora (Dora) o em_alex (Alex)
 var last_host := ""
 var anim_speed := 1.0          # 0.75 relajado, 1 normal, 1.6 rápido
 var cinematic := true
@@ -41,6 +43,8 @@ func load_profile() -> void:
 		view_mode = cfg.get_value("settings", "view_mode", view_mode)
 		music_volume = cfg.get_value("settings", "music_volume", music_volume)
 		sfx_volume = cfg.get_value("settings", "sfx_volume", sfx_volume)
+		voice_volume = cfg.get_value("settings", "voice_volume", voice_volume)
+		voice_name = cfg.get_value("settings", "voice_name", voice_name)
 		last_host = cfg.get_value("settings", "last_host", last_host)
 		anim_speed = cfg.get_value("settings", "anim_speed", anim_speed)
 		cinematic = cfg.get_value("settings", "cinematic", cinematic)
@@ -61,6 +65,8 @@ func save_profile() -> void:
 	cfg.set_value("settings", "view_mode", view_mode)
 	cfg.set_value("settings", "music_volume", music_volume)
 	cfg.set_value("settings", "sfx_volume", sfx_volume)
+	cfg.set_value("settings", "voice_volume", voice_volume)
+	cfg.set_value("settings", "voice_name", voice_name)
 	cfg.set_value("settings", "last_host", last_host)
 	cfg.set_value("settings", "anim_speed", anim_speed)
 	cfg.set_value("settings", "cinematic", cinematic)

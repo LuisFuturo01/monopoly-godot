@@ -167,7 +167,7 @@
   },
   {
    "type": "utility",
-   "name": "Empresa de Luz",
+   "name": "DELAPAZ",
    "group": "servicio",
    "price": 150,
    "multipliers": [
@@ -365,7 +365,7 @@
   },
   {
    "type": "utility",
-   "name": "Empresa de Agua",
+   "name": "EPSAS",
    "group": "servicio",
    "price": 150,
    "multipliers": [

@@ -107,6 +107,17 @@ y color. En red, el UUID identifica el asiento. Si alguien se desconecta en plen
 partida, la IA juega por él; puede volver con «Volver a la partida» (inicio) o «Pedir
 volver» (buscar salas), y el anfitrión decide si acepta. Al aceptar recupera su asiento.
 
+## Fotos y voz
+
+- **Fotos de casillas**: `data/places/NN_nombre.jpg` (por ejemplo `23_av_camacho.jpg`).
+  `data/places/LEEME.md` lista los 40 nombres y cuáles faltan; para cambiar una foto basta
+  reemplazar el archivo con el mismo nombre. Se ven en los carteles, en cada casilla (2D y 3D)
+  y en el título de propiedad.
+- **Locutor**: frases en `audio/voice/<voz>/` generadas con Kokoro (Apache-2.0), con el
+  nombre de cada terreno («Ceja de El Alto, comprado», «Inicia la subasta de Plaza Murillo»);
+  ver `audio/voice/CREDITS.md` y `tools/gen_voice.py`. En Opciones se elige la voz (Dora o
+  Alex) y el volumen del locutor (0 lo apaga).
+
 ## Red local
 
 - **Wi-Fi**: ENet cliente-servidor autoritativo. El anfitrión ejecuta el motor y tira

@@ -9,7 +9,6 @@ signal space_clicked(index: int)
 const S := BoardLayout.SIZE
 const TOP := 0.06
 const DIE := 0.4
-const PLACES_DIR := "res://data/places/"
 const PAPER := Color("#fbf8f1")
 const INK := Color("#13233f")
 const RIM := Color("#13233f")
@@ -331,12 +330,25 @@ func _build_board() -> void:
 		if sp["type"] == "street":
 			var br := BoardLayout.band_rect(i)
 			_box(Vector3(br.size.x - 0.05, 0.08, br.size.y - 0.05), _w(br.get_center(), 0.07), _mat(board.space_color(i), 0.25, 0.1))
+		var photo := UiKit.place_photo(i, sp["name"])
 		if corner:
 			var names := {"go": "SALIDA\n+Bs %d" % board.salary, "jail": "RETÉN", "free": "MIRADOR", "gotojail": "¡AL\nRETÉN!"}
-			_label(names.get(sp["type"], sp["name"]), _w(r.get_center(), ty), ang + PI / 4.0, 64, along * 1.2, INK)
+			if photo:
+				# Esquina con foto de fondo (cárcel, policía, mirador...) y un velo claro para leer el texto.
+				_tile_photo(photo, _w(r.get_center(), TOP + 0.001), ang, Vector2(along, along), Color(1, 1, 1, 0.82))
+			var cl := _label(names.get(sp["type"], sp["name"]), _w(r.get_center(), ty + 0.002), ang + PI / 4.0, 64, along * 1.2, INK)
+			if photo:
+				cl.outline_size = 16
+				cl.outline_modulate = Color.WHITE
 			_corner_prop(sp["type"], _w(r.get_center(), TOP), ang)
 			continue
 		var name_pos := r.get_center() + inward * (BoardLayout.CORNER / 2.0 - BoardLayout.BAND - 0.25)
+		if photo:
+			# Mini foto del lugar bajo la franja de color; el nombre va debajo de la foto.
+			var top_edge := BoardLayout.CORNER / 2.0 - (BoardLayout.BAND if sp["type"] == "street" else 0.06) - 0.05
+			var depth := 0.4
+			_tile_photo(photo, _w(r.get_center() + inward * (top_edge - depth / 2.0), ty), ang, Vector2(along - 0.06, depth), Color.WHITE)
+			name_pos = r.get_center() + inward * (top_edge - depth - 0.13)
 		_label(String(sp["name"]).to_upper(), _w(name_pos, ty), ang, 30, along)
 		var sub := ""
 		var sub_color := INK
@@ -352,6 +364,49 @@ func _build_board() -> void:
 			var destino: bool = sp["deck"] == "destino"
 			_label("?" if destino else "!", _w(r.get_center() - inward * 0.15, ty), ang, 110, along, Color.WHITE)
 		_build_sign(board, i)
+
+
+## Foto plana sobre la casilla, con marco blanco y recorte centrado (no se deforma).
+func _tile_photo(tex: Texture2D, pos: Vector3, angle: float, size: Vector2, tint: Color) -> void:
+	var frame := MeshInstance3D.new()
+	var fq := QuadMesh.new()
+	fq.size = size + Vector2(0.04, 0.04)
+	frame.mesh = fq
+	frame.material_override = _mat(Color.WHITE, 0.8)
+	frame.position = pos
+	frame.rotation = Vector3(-PI / 2.0, -angle, 0.0)
+	add_child(frame)
+	var mi := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = size
+	mi.mesh = q
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var aspect := float(tex.get_width()) / maxf(1.0, tex.get_height())
+	var want := size.x / size.y
+	if aspect > want:
+		m.uv1_scale = Vector3(want / aspect, 1, 1)
+		m.uv1_offset = Vector3((1.0 - want / aspect) / 2.0, 0, 0)
+	else:
+		m.uv1_scale = Vector3(1, aspect / want, 1)
+		m.uv1_offset = Vector3(0, (1.0 - aspect / want) / 2.0, 0)
+	mi.material_override = m
+	mi.position = Vector3(0, 0, 0.001)
+	frame.add_child(mi)
+	if tint.a < 1.0:
+		var veil := MeshInstance3D.new()
+		var vq := QuadMesh.new()
+		vq.size = size
+		veil.mesh = vq
+		var vm := StandardMaterial3D.new()
+		vm.albedo_color = Color(1, 1, 1, 1.0 - tint.a)
+		vm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		vm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		veil.material_override = vm
+		veil.position = Vector3(0, 0, 0.002)
+		frame.add_child(veil)
 
 
 ## Detalle 3D en cada esquina.
@@ -377,10 +432,9 @@ func _corner_prop(kind: String, pos: Vector3, ang: float) -> void:
 
 
 func _place_texture(board: Board, i: int) -> Texture2D:
-	for ext in [".jpg", ".png"]:
-		var path: String = PLACES_DIR + str(i) + ext
-		if ResourceLoader.exists(path):
-			return load(path)
+	var photo := UiKit.place_photo(i, board.space(i)["name"])
+	if photo:
+		return photo
 	# Sin foto: degradado con el color del grupo.
 	var g := Gradient.new()
 	var base := board.space_color(i) if board.space(i).has("group") else Color("#3d6fd6")
