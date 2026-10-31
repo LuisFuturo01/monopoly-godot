@@ -17,6 +17,7 @@ func _init() -> void:
 		"test_jail_doubles_no_extra_roll",
 		"test_buy_rent_and_monopoly_double",
 		"test_decline_starts_auction",
+		"test_mortgage_during_auction",
 		"test_auction_nobody_bids",
 		"test_even_building_and_hotel",
 		"test_quick_mode_hotel_after_three",
@@ -154,6 +155,23 @@ func test_decline_starts_auction() -> void:
 	check(e.owner_of(3) == 2, "gana el mejor postor")
 	check(int(e.player(2)["cash"]) == 1470, "paga su puja")
 	check(e.phase() == GameEngine.POST_ROLL, "turno continúa")
+
+
+func test_mortgage_during_auction() -> void:
+	print("test_mortgage_during_auction")
+	var e := mk(3)
+	e.s["owner"][39] = 1
+	e.player(1)["cash"] = 5
+	roll(e, 0, 1, 2)
+	run(e, {"type": "decline", "player": 0})
+	check(e.pending_actor() == 1, "puja el jugador 1")
+	check("mortgage" in e.legal_actions(1), "quien puja puede hipotecar")
+	check(not run(e, {"type": "mortgage", "player": 2, "space": 39})["ok"], "otro jugador no gestiona fuera de su turno")
+	check(run(e, {"type": "mortgage", "player": 1, "space": 39})["ok"], "hipoteca durante la subasta")
+	check(int(e.player(1)["cash"]) == 5 + e.board.mortgage_value(39), "recibe el dinero de la hipoteca")
+	check(e.phase() == GameEngine.AUCTION, "la subasta sigue")
+	check(not run(e, {"type": "build", "player": 1, "space": 39})["ok"], "en subasta no se construye")
+	check(run(e, {"type": "bid", "player": 1, "amount": 60})["ok"], "ahora puede pujar")
 
 
 func test_auction_nobody_bids() -> void:

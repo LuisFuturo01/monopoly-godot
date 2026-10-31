@@ -17,6 +17,11 @@ const CORAL := Color("#e8735a")
 const DANGER := Color("#d64550")
 const GOOD := Color("#1f9e89")
 const LINE := Color("#d9e2ec")
+## Puntos que se suman a todos los tamaños de letra (lectura cómoda en el celular).
+const FONT_BOOST := 2
+const DESTINO := Color("#f08a3c")    # cartas y casillas de Destino
+const CABILDO := Color("#3d7be0")    # cartas y casillas de Cabildo
+const PLACES_DIR := "res://data/places/"
 
 static var _theme: Theme
 static var _font: SystemFont
@@ -44,7 +49,7 @@ static func theme() -> Theme:
 		return _theme
 	var t := Theme.new()
 	t.default_font = font()
-	t.default_font_size = 19
+	t.default_font_size = 19 + FONT_BOOST
 	t.set_stylebox("panel", "PanelContainer", card())
 	t.set_stylebox("panel", "Panel", card())
 	for type in ["Button", "OptionButton"]:
@@ -114,7 +119,7 @@ static func card(color: Color = PANEL, border: Color = Color(0, 0, 0, 0)) -> Sty
 static func label(text: String, font_size: int = 18, color: Color = TEXT, wrap: bool = false) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_font_size_override("font_size", font_size + FONT_BOOST)
 	l.add_theme_color_override("font_color", color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wrap else TextServer.AUTOWRAP_OFF
 	return l
@@ -146,7 +151,7 @@ static func small_button(text: String, cb: Callable, color: Color = Color(0, 0, 
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 44)
-	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_font_size_override("font_size", 16 + FONT_BOOST)
 	var fill := color if color.a > 0 else PANEL
 	var fg := NAVY if fill.get_luminance() > 0.55 else Color.WHITE
 	b.add_theme_stylebox_override("normal", box(fill, 18, 14, 6, LINE if color.a == 0 else Color(0, 0, 0, 0), 2))
@@ -248,6 +253,29 @@ static func chip(text: String, color: Color) -> PanelContainer:
 	var l := label(text, 15, NAVY if color.get_luminance() > 0.55 else Color.WHITE)
 	p.add_child(l)
 	return p
+
+
+## Foto del lugar (data/places/<i>.jpg) o null si no hay.
+static func place_photo(i: int) -> Texture2D:
+	for ext in [".jpg", ".png"]:
+		var path: String = PLACES_DIR + str(i) + ext
+		if ResourceLoader.exists(path):
+			return load(path)
+	return null
+
+
+## Degradado diagonal entre dos colores (fondos de tarjetas sin foto).
+static func gradient_tex(a: Color, b: Color) -> GradientTexture2D:
+	var g := Gradient.new()
+	g.set_color(0, a)
+	g.set_color(1, b)
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill_from = Vector2(0, 0)
+	tex.fill_to = Vector2(1, 1)
+	tex.width = 64
+	tex.height = 64
+	return tex
 
 
 static func token_icon(token: String, color: Color, size: float = 36.0) -> Control:

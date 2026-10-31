@@ -40,6 +40,7 @@ func _ready() -> void:
 	Net.lobby_changed.connect(func(_s, _r): if _lobby_list: _render_lobby())
 	Net.game_started.connect(func(snap): start_client.emit(snap))
 	Net.session_ended.connect(func(reason): show_home(reason))
+	Net.rejoin_waiting.connect(_show_rejoin_wait)
 	Net.discovery.hosts_changed.connect(func(_h): _render_hosts())
 	show_home()
 
@@ -49,14 +50,11 @@ func _set_page(content: Control, card := true) -> void:
 		_page.queue_free()
 	_lobby_list = null
 	_hosts_list = null
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var center := CenterContainer.new()
-	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	center.custom_minimum_size = get_viewport_rect().size
-	scroll.add_child(center)
+	var scroll := EasyScroll.wrap(center)
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 16)
@@ -106,10 +104,13 @@ func show_home(message: String = "") -> void:
 	Net.discovery.stop()
 	var v := UiKit.vbox(14)
 	v.custom_minimum_size = Vector2(460, 0)
-	var logo := UiKit.label("LUCHOPOLIS", 60, UiKit.HEADING)
-	logo.add_theme_font_override("font", UiKit.font_black())
-	logo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var logo := TextureRect.new()
+	logo.texture = load("res://branding/splash_round.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.custom_minimum_size = Vector2(0, minf(190.0, get_viewport_rect().size.y * 0.26))
 	v.add_child(logo)
+	_pulse(logo)
 	var tag := UiKit.label("Compra, construye y negocia en La Paz – El Alto", 16, UiKit.MUTED)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(tag)
@@ -132,6 +133,12 @@ func show_home(message: String = "") -> void:
 	edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	chip.add_child(edit)
 	v.add_child(UiKit.panel(chip, UiKit.SOFT))
+	if Net.can_rejoin():
+		var back := UiKit.button("Volver a la partida", func():
+			_mode = String(Net.rejoin_info.get("kind", "wifi"))
+			_join(_mode, String(Net.rejoin_info.get("address", ""))), true, UiKit.ACCENT_2)
+		back.custom_minimum_size.y = 62
+		v.add_child(back)
 	var play := UiKit.button("JUGAR", show_modes, true)
 	play.custom_minimum_size.y = 68
 	play.add_theme_font_size_override("font_size", 26)
@@ -702,7 +709,7 @@ func _render_hosts() -> void:
 	var entries := []
 	if _mode == "wifi":
 		for h in Net.discovery.hosts():
-			entries.append({"name": h.get("name", "Sala"), "info": "%d de %d jugadores%s" % [int(h.get("players", 0)), int(h.get("max", 6)), " · en juego" if h.get("in_game", false) else ""], "address": h["ip"], "full": h.get("in_game", false)})
+			entries.append({"name": h.get("name", "Sala"), "info": "%d de %d jugadores%s" % [int(h.get("players", 0)), int(h.get("max", 6)), " · en juego" if h.get("in_game", false) else ""], "address": h["ip"], "full": false, "in_game": h.get("in_game", false)})
 	else:
 		for d in (BluetoothAdapter.new() as BluetoothAdapter).paired_devices():
 			entries.append({"name": d["name"], "info": "Dispositivo emparejado", "address": d["address"], "full": false})
@@ -714,7 +721,8 @@ func _render_hosts() -> void:
 		col.add_child(UiKit.label(entry["name"], 18, UiKit.HEADING))
 		col.add_child(UiKit.label(entry["info"], 13, UiKit.MUTED))
 		row.add_child(col)
-		var join := UiKit.button("Unirme", func(): _join(_mode, entry["address"]), true)
+		# En una partida empezada solo puede volver quien ya tenía asiento, y el anfitrión decide.
+		var join := UiKit.button("Pedir volver" if entry.get("in_game", false) else "Unirme", func(): _join(_mode, entry["address"]), true)
 		join.disabled = entry["full"]
 		row.add_child(join)
 		_hosts_list.add_child(card)
@@ -735,6 +743,24 @@ func _join(kind: String, address: String) -> void:
 		show_home("No se pudo conectar con la sala.")
 		return
 	show_lobby()
+
+
+## Pantalla de espera mientras el anfitrión acepta o rechaza el regreso.
+func _show_rejoin_wait() -> void:
+	var v := UiKit.vbox(16)
+	v.custom_minimum_size = Vector2(460, 0)
+	v.add_child(_title("Volviendo a la partida", "El anfitrión debe aceptar tu solicitud"))
+	var dots := UiKit.label("Esperando respuesta", 20, UiKit.MUTED)
+	dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(dots)
+	var tw := dots.create_tween().set_loops()
+	for k in 4:
+		tw.tween_callback(func(): dots.text = "Esperando respuesta" + ".".repeat(k))
+		tw.tween_interval(0.4)
+	v.add_child(UiKit.button("Cancelar", func():
+		Net.leave()
+		show_home()))
+	_set_page(v)
 
 
 func show_lobby() -> void:

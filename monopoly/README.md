@@ -25,9 +25,9 @@ core/       Reglas puras (RefCounted, sin nodos). Testeables en headless.
   ai_brain.gd       IA fácil / media / difícil
 data/       Tablero, precios, alquileres y mazos (JSON editable)
 game/       GameController (enruta comandos: local, IA o red), EventPlayer (línea
-            de tiempo de animaciones), GameAudio, Profile (autoload)
+			de tiempo de animaciones), GameAudio, Profile (autoload)
 net/        NetworkAdapter (abstracción de transporte), EnetAdapter (Wi-Fi),
-            BluetoothAdapter + BluetoothMultiplayerPeer, LanDiscovery (UDP), NetSession (autoload "Net")
+			BluetoothAdapter + BluetoothMultiplayerPeer, LanDiscovery (UDP), NetSession (autoload "Net")
 views/      BoardView2D y BoardView3D (solo leen estado y eventos), BoardLayout, TokenArt
 ui/         MainMenu, Hud, UiKit (tema)
 audio/      Sfx (autoload): efectos sintetizados + música lo-fi con AudioStreamGenerator
@@ -103,7 +103,9 @@ Diferencias que quedan, propias de la versión digital:
 ## Perfil sin autenticación
 
 Cada dispositivo genera un UUID local (`user://profile.cfg`) con nombre, apodo, ficha
-y color. En red, el UUID identifica el asiento: al reconectar se recupera.
+y color. En red, el UUID identifica el asiento. Si alguien se desconecta en plena
+partida, la IA juega por él; puede volver con «Volver a la partida» (inicio) o «Pedir
+volver» (buscar salas), y el anfitrión decide si acepta. Al aceptar recupera su asiento.
 
 ## Red local
 

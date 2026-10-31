@@ -15,6 +15,8 @@ func _on_event(ev: Dictionary) -> void:
 		"dice_rolled":
 			Sfx.play("dice_roll", 0.05)
 			Sfx.play_later("dice_stop", EventPlayer.DICE_TIME * 0.85, 0.08)
+			if ev["double"]:
+				Sfx.play_later("doubles", EventPlayer.DICE_TIME * 0.95)
 		"moved":
 			for k in ev["path"].size():
 				Sfx.play_later("step", (k + 0.85) * EventPlayer.STEP_TIME, 0.12)
@@ -31,6 +33,22 @@ func _on_event(ev: Dictionary) -> void:
 			Sfx.play_later("cash", 0.15)
 		"built":
 			Sfx.play("build", 0.05)
+		"sold_building":
+			Sfx.play("sell", 0.05)
+		"mortgaged":
+			Sfx.play("mortgage")
+		"unmortgaged":
+			Sfx.play("cash")
+		"auction_ended":
+			Sfx.play("hammer")
+		"bid_pass":
+			Sfx.play("pass")
+		"trade_proposed":
+			Sfx.play("whoosh")
+		"jail_released":
+			Sfx.play("doubles")
+		"pot_collected":
+			Sfx.play("trade_ok")
 		"card_drawn":
 			Sfx.play("card")
 		"auction_started":
@@ -41,7 +59,9 @@ func _on_event(ev: Dictionary) -> void:
 			Sfx.play("turn")
 		"trade_resolved":
 			if ev["result"] == "accepted":
-				Sfx.play("cash")
+				Sfx.play("trade_ok")
+			elif ev["result"] in ["rejected", "invalid"]:
+				Sfx.play("trade_no")
 		"bankrupt":
 			Sfx.play("lose")
 		"game_over":

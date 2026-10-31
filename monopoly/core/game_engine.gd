@@ -355,7 +355,7 @@ func legal_actions(pid: int) -> Array:
 				out.append_array(["decline", "sell_building", "mortgage"])
 		AUCTION:
 			if pid == pending_actor():
-				out.append_array(["bid", "pass_bid"])
+				out.append_array(["bid", "pass_bid", "sell_building", "mortgage"])
 		DEBT:
 			if pid == pending_actor():
 				if player(pid)["cash"] >= int(s["debts"][0]["amount"]):
@@ -848,7 +848,8 @@ func _end_auction() -> void:
 
 func _can_manage(pid: int) -> String:
 	var ph := phase()
-	if ph == DEBT:
+	if ph == DEBT or ph == AUCTION:
+		# En deuda o en una subasta, quien tiene el turno puede reunir dinero.
 		return "" if pid == pending_actor() else "No puedes gestionar ahora"
 	if pid != current():
 		return "No es tu turno"
@@ -859,7 +860,7 @@ func _can_manage(pid: int) -> String:
 
 func _cmd_build(pid: int, i: int) -> String:
 	var err := _can_manage(pid)
-	if err == "" and phase() in [DEBT, AWAIT_BUY]:
+	if err == "" and phase() in [DEBT, AWAIT_BUY, AUCTION]:
 		err = "Ahora solo puedes conseguir dinero"
 	if err == "":
 		err = can_build(pid, i) if i >= 0 else "Casilla inválida"
@@ -918,7 +919,7 @@ func _cmd_mortgage(pid: int, i: int) -> String:
 
 func _cmd_unmortgage(pid: int, i: int) -> String:
 	var err := _can_manage(pid)
-	if err == "" and phase() in [DEBT, AWAIT_BUY]:
+	if err == "" and phase() in [DEBT, AWAIT_BUY, AUCTION]:
 		err = "Ahora solo puedes conseguir dinero"
 	if err == "":
 		err = can_unmortgage(pid, i) if i >= 0 else "Casilla inválida"
@@ -1210,10 +1211,10 @@ func _transfer(from: int, to: int, amount: int, reason: String) -> void:
 		return
 	if from >= 0:
 		player(from)["cash"] -= amount
-		_ev("money", {"player": from, "delta": -amount, "reason": reason})
+		_ev("money", {"player": from, "delta": -amount, "reason": reason, "other": to})
 	if to >= 0:
 		player(to)["cash"] += amount
-		_ev("money", {"player": to, "delta": amount, "reason": reason})
+		_ev("money", {"player": to, "delta": amount, "reason": reason, "other": from})
 	elif to == POT:
 		s["pot"] += amount
 		_ev("pot", {"amount": s["pot"]})

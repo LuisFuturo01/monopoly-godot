@@ -32,11 +32,66 @@ func _ready() -> void:
 		_net_test_join(_args["net-join"])
 	else:
 		_show_menu()
+		if _args.keys().all(func(k): return k in ["shot", "time"]):
+			_play_intro()
+	if _args.has("cam") and _view3d:
+		# --cam=yaw_grados,pitch_grados,distancia,x,z  (solo para revisar la escena 3D)
+		var c: PackedStringArray = _args["cam"].split(",")
+		Profile.cinematic = false
+		_view3d.cinematic = false
+		_view3d._cam_yaw = deg_to_rad(float(c[0]))
+		_view3d._cam_pitch = deg_to_rad(float(c[1]))
+		_view3d._cam_dist = float(c[2])
+		_view3d._cam_target = Vector3(float(c[3]), 0.3, float(c[4]))
+		_view3d.set_meta("fixed_cam", true)
 	if _args.has("shot"):
 		await get_tree().create_timer(float(_args.get("time", "6"))).timeout
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(_args["shot"])
 		get_tree().quit()
+
+
+## Entrada: la insignia aparece con un rebote, un destello dorado la rodea y se abre al menú.
+func _play_intro() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var bg := UiKit.gradient_bg()
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(bg)
+	var vs := get_viewport().get_visible_rect().size
+	var side := minf(vs.x, vs.y) * 0.62
+	var ring := Panel.new()
+	ring.add_theme_stylebox_override("panel", UiKit.box(Color(0, 0, 0, 0), int(side), 0, 0, UiKit.ACCENT, 6))
+	ring.size = Vector2(side, side)
+	ring.position = (vs - ring.size) / 2.0
+	ring.pivot_offset = ring.size / 2.0
+	ring.modulate.a = 0.0
+	layer.add_child(ring)
+	var logo := TextureRect.new()
+	logo.texture = load("res://branding/splash_round.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.size = Vector2(side, side)
+	logo.position = (vs - logo.size) / 2.0
+	logo.pivot_offset = logo.size / 2.0
+	logo.scale = Vector2(0.2, 0.2)
+	logo.rotation = -0.5
+	logo.modulate.a = 0.0
+	layer.add_child(logo)
+	var tw := create_tween()
+	tw.tween_property(logo, "modulate:a", 1.0, 0.25)
+	tw.parallel().tween_property(logo, "scale", Vector2.ONE, 0.9).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(logo, "rotation", 0.0, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func(): Sfx.play("doubles"))
+	tw.tween_property(ring, "modulate:a", 1.0, 0.05)
+	tw.parallel().tween_property(ring, "scale", Vector2(1.5, 1.5), 0.6).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(ring, "modulate:a", 0.0, 0.6).set_delay(0.05)
+	tw.tween_interval(0.35)
+	tw.tween_property(logo, "scale", Vector2(1.15, 1.15), 0.3).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(logo, "modulate:a", 0.0, 0.3)
+	tw.parallel().tween_property(bg, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(layer.queue_free)
 
 
 func _show_menu(message: String = "") -> void:
@@ -73,15 +128,6 @@ func _start_demo() -> void:
 	var rules := RulesConfig.classic()
 	rules.speed_die = true
 	_start_game("local", seats, rules)
-	if _args.has("cam"):
-		# --cam=yaw_grados,pitch_grados,distancia,x,z  (solo para revisar la escena 3D)
-		var c: PackedStringArray = _args["cam"].split(",")
-		Profile.cinematic = false
-		_view3d.cinematic = false
-		_view3d._cam_yaw = deg_to_rad(float(c[0]))
-		_view3d._cam_pitch = deg_to_rad(float(c[1]))
-		_view3d._cam_dist = float(c[2])
-		_view3d._cam_target = Vector3(float(c[3]), 0.3, float(c[4]))
 	if _args.has("think"):
 		_controller.ai_think_time = float(_args["think"])
 	if _args.has("log"):
@@ -184,6 +230,20 @@ func _hud_test(panel: String) -> void:
 			_hud._show_trade_composer()
 		"space":
 			_hud._show_space(6)
+		"deedback":
+			_hud._deed_back[6] = true
+			_hud._show_space(6)
+		"player":
+			_hud._show_player(0)
+		"card":
+			_hud._show_card({"deck": "destino", "text": "Ganaste el concurso de morenada de la Entrada del Gran Poder. Cobra Bs 100."})
+		"rejoin":
+			_hud._on_rejoin_request(5, 1)
+		"flow":
+			await get_tree().create_timer(0.5).timeout
+			_hud._on_event({"type": "money", "player": 0, "delta": -250, "reason": "Alquiler", "other": 1})
+			_hud._on_event({"type": "trade_resolved", "from": 0, "to": 1, "result": "accepted"})
+			_hud._on_event({"type": "bought", "player": 0, "space": 11, "price": 140})
 		"buy":
 			e.player(0)["pos"] = 11
 			_controller.player_events.sync_from(e)
@@ -225,6 +285,7 @@ func _net_test_host() -> void:
 	Profile.uuid = "test-host"
 	Profile.display_name = "Anfitrion"
 	var rules := RulesConfig.classic()
+	Net.auto_approve_rejoin = true
 	if Net.host_game(EnetAdapter.new(), Profile.as_seat(), rules.to_dict(), "Prueba") != OK:
 		print("NETTEST host_failed")
 		get_tree().quit(1)

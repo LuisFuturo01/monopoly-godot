@@ -5,7 +5,9 @@ extends Node
 ##   con AudioStreamGenerator.
 
 const RATE := 22050
-const POOL_SIZE := 10
+const POOL_SIZE := 14
+## Ganancia extra del bus de música: el bucle lo-fi es suave y al máximo se perdía.
+const MUSIC_BOOST_DB := 6.0
 
 var _sounds: Dictionary = {}
 var _pool: Array = []
@@ -46,7 +48,7 @@ func _exit_tree() -> void:
 
 
 func apply_volumes() -> void:
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(Profile.music_volume, 0.0001)))
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(Profile.music_volume, 0.0001)) + MUSIC_BOOST_DB)
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(Profile.sfx_volume, 0.0001)))
 
 
@@ -135,7 +137,8 @@ func _render_music() -> void:
 			x += _mrng.randf_range(-0.12, 0.12)
 		x += _mrng.randf_range(-0.004, 0.004)
 		lp += (x - lp) * 0.32
-		var y := clampf(lp * 0.9, -1.0, 1.0)
+		# Más presencia: ganancia con saturación suave (tanh) en lugar de recortar.
+		var y := tanh(lp * 2.4) * 0.92
 		out[i] = Vector2(y, y)
 	call_deferred("_set_music", out)
 
@@ -205,13 +208,24 @@ func _build_sounds() -> void:
 	_sounds["alert"] = _wav(_alert())
 	_sounds["jail"] = _wav(_jail())
 	_sounds["buy"] = _wav(_arpeggio([72, 76, 79, 84], 0.09, 0.35))
-	_sounds["build"] = _wav(_arpeggio([67, 72], 0.07, 0.3))
+	_sounds["build"] = _wav(_build_sound())
 	_sounds["card"] = _wav(_swish())
 	_sounds["click"] = _wav(_tone(1200.0, 0.04, 0.25, 60.0))
 	_sounds["bid"] = _wav(_tone(880.0, 0.08, 0.3, 30.0))
 	_sounds["turn"] = _wav(_arpeggio([79, 84], 0.06, 0.2))
 	_sounds["win"] = _wav(_arpeggio([60, 64, 67, 72, 76, 79, 84], 0.11, 0.35))
 	_sounds["lose"] = _wav(_arpeggio([67, 63, 60, 55], 0.18, 0.3))
+	_sounds["bill"] = _wav(_paper(0.14, 0.35))
+	_sounds["stamp"] = _wav(_stamp())
+	_sounds["flip"] = _wav(_flip())
+	_sounds["trade_ok"] = _wav(_mix(_arpeggio([67, 71, 74, 79, 83], 0.07, 0.4), _cash(), 0.3))
+	_sounds["trade_no"] = _wav(_buzzer())
+	_sounds["hammer"] = _wav(_gavel())
+	_sounds["pass"] = _wav(_arpeggio([64, 59], 0.08, 0.22))
+	_sounds["mortgage"] = _wav(_mix(_paper(0.25, 0.3), _tone(220.0, 0.6, 0.3, 6.0), 0.0))
+	_sounds["sell"] = _wav(_mix(_coin(), _coin(), 0.1))
+	_sounds["doubles"] = _wav(_arpeggio([84, 88, 91, 96], 0.05, 0.25))
+	_sounds["whoosh"] = _wav(_swish())
 
 
 func _wav(samples: PackedFloat32Array) -> AudioStreamWAV:
@@ -340,6 +354,79 @@ func _swish() -> PackedFloat32Array:
 		prev = w
 		b[i] = hp * sin(PI * t / 0.35) * 0.25
 	return b
+
+
+## Suma `b` a `a` empezando `offset` segundos después.
+func _mix(a: PackedFloat32Array, b: PackedFloat32Array, offset: float) -> PackedFloat32Array:
+	var start := int(offset * RATE)
+	var out := a.duplicate()
+	if out.size() < start + b.size():
+		out.resize(start + b.size())
+	for i in b.size():
+		out[start + i] += b[i]
+	return out
+
+
+## Billete o papel: ráfaga de ruido filtrado que se desliza.
+func _paper(dur: float, amp: float) -> PackedFloat32Array:
+	var b := _buffer(dur)
+	var lp := 0.0
+	for i in b.size():
+		var t := float(i) / RATE
+		var w := _rng.randf_range(-1.0, 1.0)
+		lp += (w - lp) * (0.5 - 0.35 * t / dur)
+		b[i] = (w - lp) * sin(PI * t / dur) * amp
+	return b
+
+
+## Sello sobre el título: golpe grave seco con chasquido de papel.
+func _stamp() -> PackedFloat32Array:
+	return _mix(_thud(0.3, 80.0, 0.9), _paper(0.06, 0.4), 0.0)
+
+
+## Tarjeta que gira: barrido corto ascendente.
+func _flip() -> PackedFloat32Array:
+	var b := _buffer(0.16)
+	var prev := 0.0
+	for i in b.size():
+		var t := float(i) / RATE
+		var w := _rng.randf_range(-1.0, 1.0)
+		var hp := w - prev * (0.6 + t * 2.0)
+		prev = w
+		b[i] = hp * sin(PI * t / 0.16) * 0.22
+	return b
+
+
+## Trato rechazado: dos notas graves descendentes con timbre áspero.
+func _buzzer() -> PackedFloat32Array:
+	var b := _buffer(0.6)
+	for k in 2:
+		var f := _midi(55 - k * 4)
+		var start := int(k * 0.22 * RATE)
+		for i in mini(int(0.25 * RATE), b.size() - start):
+			var t := float(i) / RATE
+			var v := sin(TAU * f * t) + 0.5 * sin(TAU * f * 3.0 * t) + 0.3 * sin(TAU * f * 5.0 * t)
+			b[start + i] += v * minf(1.0, t * 100.0) * exp(-t * 6.0) * 0.16
+	return b
+
+
+## Martillo de subasta: dos golpes de madera.
+func _gavel() -> PackedFloat32Array:
+	var knock := _buffer(0.15)
+	for i in knock.size():
+		var t := float(i) / RATE
+		knock[i] = (sin(TAU * 380.0 * t) * 0.7 + sin(TAU * 910.0 * t) * 0.3 + _rng.randf_range(-1.0, 1.0) * exp(-t * 200.0)) * exp(-t * 38.0) * 0.6
+	return _mix(_mix(knock, knock, 0.18), _arpeggio([72, 79], 0.06, 0.2), 0.32)
+
+
+## Obra: tres martillazos y una campanita al terminar.
+func _build_sound() -> PackedFloat32Array:
+	var tap := _buffer(0.08)
+	for i in tap.size():
+		var t := float(i) / RATE
+		tap[i] = (sin(TAU * 1300.0 * t) * 0.5 + _rng.randf_range(-1.0, 1.0) * 0.5) * exp(-t * 70.0) * 0.4
+	var out := _mix(_mix(tap, tap, 0.12), tap, 0.24)
+	return _mix(out, _arpeggio([72, 76, 79], 0.06, 0.3), 0.38)
 
 
 func _arpeggio(notes: Array, step: float, amp: float) -> PackedFloat32Array:

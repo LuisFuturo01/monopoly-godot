@@ -43,7 +43,9 @@ var _anim: Dictionary = {}          # pid -> {pos, from, queue, t}
 var _units: Dictionary = {}         # casilla -> {"kind": "houses"|"hotel", "nodes": Array}
 var _owner_marks: Dictionary = {}
 var _mortgage_marks: Dictionary = {}
-var _signs: Array = []              # {node, outward: Vector3}
+var _signs: Array = []              # {node, outward: Vector3, space, frame, price}
+var _sign_of: Dictionary = {}       # casilla -> entrada de _signs
+var _flags: Array = []              # banderines de dueño que ondean
 var _glow: MeshInstance3D
 var _dice: Array = []
 var _dice_tween: Tween
@@ -86,7 +88,8 @@ func _ready() -> void:
 
 func bind(c: GameController) -> void:
 	controller = c
-	controller.state_changed.connect(_refresh)
+	# Mientras se reproducen eventos, el tablero no se adelanta: cada casilla cambia con su evento.
+	controller.state_changed.connect(func(): if not controller.player_events.is_busy(): _refresh())
 	controller.player_events.event_played.connect(_on_event)
 	controller.player_events.drained.connect(_on_drained)
 	for p in controller.engine.players():
@@ -303,7 +306,7 @@ func _tile_color(board: Board, i: int) -> Color:
 		"utility":
 			return Color("#fff1c9")
 		"card":
-			return Color("#ffe4d6") if sp["deck"] == "destino" else Color("#dbe8ff")
+			return UiKit.DESTINO.lerp(Color.WHITE, 0.35) if sp["deck"] == "destino" else UiKit.CABILDO.lerp(Color.WHITE, 0.45)
 		"tax":
 			return Color("#ffdcdc")
 	return CORNER_COLORS.get(sp["type"], PAPER)
@@ -347,7 +350,7 @@ func _build_board() -> void:
 			_label(sub, _w(r.get_center() - inward * 0.55, ty), ang, 38, along, sub_color)
 		if sp["type"] == "card":
 			var destino: bool = sp["deck"] == "destino"
-			_label("?" if destino else "!", _w(r.get_center() - inward * 0.15, ty), ang, 110, along, Color("#e8735a") if destino else Color("#3d6fd6"))
+			_label("?" if destino else "!", _w(r.get_center() - inward * 0.15, ty), ang, 110, along, Color.WHITE)
 		_build_sign(board, i)
 
 
@@ -411,7 +414,7 @@ func _build_sign(board: Board, i: int) -> void:
 	var group_col := board.space_color(i) if sp.has("group") and board.groups.has(sp["group"]) else (Color("#3d6fd6") if sp["type"] != "tax" else Color("#d64550"))
 	if sp["type"] == "card":
 		group_col = Color("#e8735a") if sp["deck"] == "destino" else Color("#3d6fd6")
-	_box(Vector3(0.98, 0.7, 0.04), Vector3.ZERO, _mat(INK, 0.3), panel)
+	var frame := _box(Vector3(0.98, 0.7, 0.04), Vector3.ZERO, _mat(INK, 0.3), panel)
 	var photo := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.9, 0.44)
@@ -448,6 +451,10 @@ func _build_sign(board: Board, i: int) -> void:
 		price.modulate = TRIM
 		price.position = Vector3(0.3, 0.27, 0.03)
 		panel.add_child(price)
+		var entry := {"node": root, "outward": Vector3(outward.x, 0, outward.y), "space": i, "frame": frame, "price": price, "panel": panel}
+		_signs.append(entry)
+		_sign_of[i] = entry
+		return
 	_signs.append({"node": root, "outward": Vector3(outward.x, 0, outward.y)})
 
 
@@ -897,24 +904,109 @@ func _refresh() -> void:
 			tok.visible = not p["bankrupt"]
 
 
+## Dueño a simple vista: marco del color del jugador alrededor de la casilla, banderín en la
+## esquina exterior y el cartel con el borde de su color y su nombre. Las libres muestran «EN VENTA».
 func _update_owner(i: int, own: int, mortgaged: bool) -> void:
 	var r := BoardLayout.rect(i)
 	var outward := -BoardLayout.inward(i)
 	if not _owner_marks.has(i):
-		var horizontal := BoardLayout.side(i) % 2 == 0
-		var size := Vector3(r.size.x - 0.1, 0.03, 0.14) if horizontal else Vector3(0.14, 0.03, r.size.y - 0.1)
-		var pos := r.get_center() + outward * (BoardLayout.CORNER / 2.0 - 0.1)
-		_owner_marks[i] = _box(size, _w(pos, TOP + 0.01), _mat(Color.WHITE))
+		var mark := Node3D.new()
+		mark.position = _w(r.get_center(), TOP + 0.012)
+		add_child(mark)
+		var th := 0.07
+		var sx := r.size.x - 0.06
+		var sz := r.size.y - 0.06
+		for spec in [[Vector3(sx, 0.03, th), Vector3(0, 0, (sz - th) / 2.0)], [Vector3(sx, 0.03, th), Vector3(0, 0, -(sz - th) / 2.0)],
+				[Vector3(th, 0.03, sz), Vector3((sx - th) / 2.0, 0, 0)], [Vector3(th, 0.03, sz), Vector3(-(sx - th) / 2.0, 0, 0)]]:
+			_box(spec[0], spec[1], _mat(Color.WHITE), mark).set_meta("edge", true)
+		var along := Vector2(1, 0) if BoardLayout.side(i) % 2 == 0 else Vector2(0, 1)
+		var corner := outward * (BoardLayout.CORNER / 2.0 - 0.16) + along * (minf(r.size.x, r.size.y) / 2.0 - 0.14)
+		var flag := Node3D.new()
+		flag.name = "Flag"
+		flag.position = Vector3(corner.x, 0, corner.y)
+		mark.add_child(flag)
+		_cyl(0.012, 0.012, 0.42, Vector3(0, 0.21, 0), _mat(Color("#dfe6e9"), 0.3, 0.7), flag)
+		_sphere(0.022, Vector3(0, 0.43, 0), _mat(TRIM, 0.3, 0.6), flag)
+		var cloth := _box(Vector3(0.2, 0.12, 0.012), Vector3(0.1, 0.34, 0), _mat(Color.WHITE), flag)
+		cloth.name = "Cloth"
+		_flags.append(flag)
+		mark.visible = false
+		_owner_marks[i] = mark
 		_mortgage_marks[i] = _box(Vector3(r.size.x - 0.08, 0.01, r.size.y - 0.08), _w(r.get_center(), TOP + 0.03), _veil())
-	var mark: MeshInstance3D = _owner_marks[i]
+	var mark: Node3D = _owner_marks[i]
 	var was_visible := mark.visible
+	var was_mortgaged: bool = _mortgage_marks[i].visible
 	mark.visible = own >= 0
+	var flag: Node3D = mark.get_node("Flag")
 	if own >= 0:
-		mark.material_override = _mat(Color.html(controller.engine.player(own)["color"]), 0.3)
+		var pcol := Color.html(controller.engine.player(own)["color"])
+		var m := _mat(pcol, 0.35)
+		for c in mark.get_children():
+			if c.has_meta("edge"):
+				c.material_override = m
+		flag.get_node("Cloth").material_override = _mat(pcol.lerp(Color.GRAY, 0.6) if mortgaged else pcol, 0.4)
 		if not was_visible and _animate_buildings:
-			mark.scale = Vector3(0.1, 1, 0.1)
-			create_tween().tween_property(mark, "scale", Vector3.ONE, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			mark.scale = Vector3(0.2, 1, 0.2)
+			create_tween().tween_property(mark, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			flag.scale = Vector3(1, 0.01, 1)
+			create_tween().tween_property(flag, "scale", Vector3.ONE, 0.6).set_delay(0.15).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+		elif mortgaged != was_mortgaged and _animate_buildings:
+			# Hipoteca: el banderín baja a media asta; al levantarla vuelve a subir.
+			create_tween().tween_property(flag, "scale", Vector3(1, 0.55 if mortgaged else 1.0, 1), 0.4).set_trans(Tween.TRANS_BACK)
+		elif not _animate_buildings:
+			flag.scale = Vector3(1, 0.55 if mortgaged else 1.0, 1)
 	_mortgage_marks[i].visible = mortgaged
+	_update_sign_owner(i, own, mortgaged)
+
+
+func _update_sign_owner(i: int, own: int, mortgaged: bool) -> void:
+	if not _sign_of.has(i):
+		return
+	var s: Dictionary = _sign_of[i]
+	var price: Label3D = s["price"]
+	var frame: MeshInstance3D = s["frame"]
+	if own < 0:
+		price.text = "EN VENTA  Bs %d" % controller.board.price(i)
+		price.font_size = 22
+		price.modulate = TRIM
+		price.outline_modulate = INK
+		price.position.x = 0.0
+		frame.material_override = _mat(INK, 0.3)
+		return
+	var p := controller.engine.player(own)
+	var pcol := Color.html(p["color"])
+	price.text = ("HIPOTECADA · " if mortgaged else "DE ") + String(p["name"]).to_upper()
+	price.font_size = 22 if mortgaged else 28
+	price.modulate = Color.WHITE
+	price.outline_modulate = pcol.darkened(0.35)
+	price.position.x = 0.0
+	frame.material_override = _mat(pcol.lerp(Color.GRAY, 0.5) if mortgaged else pcol, 0.3)
+
+
+## Festejo de compra: confeti del color del dueño sobre la casilla y el cartel salta.
+func _claim(i: int, pid: int) -> void:
+	if pid < 0:
+		return
+	var r := BoardLayout.rect(i)
+	var pcol := Color.html(controller.engine.player(pid)["color"])
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.05, 0.005, 0.03)
+	_burst(_w(r.get_center(), TOP + 0.1), mesh, pcol, 30, 50.0, 2.2, true)
+	_burst(_w(r.get_center(), TOP + 0.1), mesh, TRIM, 16, 40.0, 1.8, true)
+	_sync_space(i)
+	if _sign_of.has(i):
+		var panel: Node3D = _sign_of[i]["panel"]
+		var tw := create_tween()
+		tw.tween_property(panel, "position:y", 1.05, 0.18).set_ease(Tween.EASE_OUT)
+		tw.tween_property(panel, "position:y", 0.82, 0.45).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+
+
+## Aplica el estado actual del motor a una sola casilla (en el momento de su evento).
+func _sync_space(i: int) -> void:
+	var e := controller.engine
+	if controller.board.is_property(i):
+		_update_owner(i, e.owner_of(i), e.is_mortgaged(i))
+		_update_buildings(i, e.houses_on(i))
 
 
 func _veil() -> StandardMaterial3D:
@@ -946,14 +1038,93 @@ func _update_buildings(i: int, h: int) -> void:
 	while nodes.size() < want:
 		var unit: Node3D
 		if want_kind == "hotel":
-			unit = _building(_w(c, TOP + 0.05), Vector3(0.56, 0.26, 0.26), Color("#d64550"), yaw)
+			unit = _hotel_unit(_w(c, TOP + 0.05), yaw)
 		else:
 			var p := c + along * (k - 1.5) * 0.23
-			unit = _building(_w(p, TOP + 0.05), Vector3(0.17, 0.15, 0.17), Color("#2e9e5b"), yaw)
+			unit = _house_unit(_w(p, TOP + 0.05), yaw)
 		nodes.append(unit)
 		if _animate_buildings:
 			_construct(unit, k * 0.1)
 		k += 1
+
+
+func _lit_mat() -> StandardMaterial3D:
+	if not _mats.has("lit"):
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color("#ffe9a8")
+		m.emission_enabled = true
+		m.emission = Color("#ffd36b")
+		m.emission_energy_multiplier = 0.6
+		_mats["lit"] = m
+	return _mats["lit"]
+
+
+func _unit_root(base: Vector3, yaw: float) -> Array:
+	var node := Node3D.new()
+	node.position = base
+	node.rotation.y = yaw
+	add_child(node)
+	var body := Node3D.new()
+	body.name = "Body"
+	node.add_child(body)
+	return [node, body]
+
+
+## Casa: zócalo, muros verdes, techo de teja, chimenea, puerta y ventanas encendidas.
+func _house_unit(base: Vector3, yaw: float) -> Node3D:
+	var nb := _unit_root(base, yaw)
+	var node: Node3D = nb[0]
+	var body: Node3D = nb[1]
+	var w := 0.17
+	var h := 0.12
+	_box(Vector3(w + 0.03, 0.02, w + 0.03), Vector3(0, 0.01, 0), _mat(Color("#e9e2d0"), 0.8), body)
+	_box(Vector3(w, h, w), Vector3(0, 0.02 + h / 2.0, 0), _mat(Color("#3fae6a"), 0.5), body)
+	_prism(Vector3(w * 1.2, h * 0.85, w * 1.14), Vector3(0, 0.02 + h + h * 0.42, 0), _mat(Color("#b5523b"), 0.45), PI / 2.0, body)
+	_box(Vector3(0.028, 0.08, 0.028), Vector3(w * 0.26, 0.02 + h + 0.07, -w * 0.18), _mat(Color("#8f3f2f"), 0.6), body)
+	for face in [1.0, -1.0]:
+		_box(Vector3(0.036, 0.06, 0.006), Vector3(0, 0.05, face * (w / 2.0 + 0.003)), _mat(Color("#6b3e26"), 0.6), body)
+		for sx in [-1.0, 1.0]:
+			_box(Vector3(0.03, 0.03, 0.006), Vector3(sx * 0.052, 0.09, face * (w / 2.0 + 0.003)), _lit_mat(), body)
+	node.set_meta("size", Vector3(w, h * 1.9, w))
+	return node
+
+
+## Hotel: tres pisos con filas de ventanas, losa, marquesina dorada y letrero «H».
+func _hotel_unit(base: Vector3, yaw: float) -> Node3D:
+	var nb := _unit_root(base, yaw)
+	var node: Node3D = nb[0]
+	var body: Node3D = nb[1]
+	var w := 0.54
+	var h := 0.36
+	var d := 0.26
+	_box(Vector3(w + 0.04, 0.02, d + 0.04), Vector3(0, 0.01, 0), _mat(Color("#e9e2d0"), 0.8), body)
+	_box(Vector3(w, h, d), Vector3(0, 0.02 + h / 2.0, 0), _mat(Color("#d64550"), 0.4), body)
+	for floor_i in 3:
+		var y := 0.075 + floor_i * 0.1
+		for col in 5:
+			var x := -w / 2.0 + 0.07 + col * (w - 0.14) / 4.0
+			for face in [1.0, -1.0]:
+				if floor_i == 0 and col == 2:
+					continue
+				_box(Vector3(0.05, 0.045, 0.006), Vector3(x, y, face * (d / 2.0 + 0.003)), _lit_mat(), body)
+	_box(Vector3(w + 0.04, 0.03, d + 0.04), Vector3(0, 0.02 + h + 0.015, 0), _mat(Color("#8f2d36"), 0.5), body)
+	for face in [1.0, -1.0]:
+		_box(Vector3(0.06, 0.06, 0.006), Vector3(0, 0.05, face * (d / 2.0 + 0.003)), _mat(Color("#6b3e26"), 0.6), body)
+		_box(Vector3(0.16, 0.012, 0.06), Vector3(0, 0.095, face * (d / 2.0 + 0.03)), _mat(TRIM, 0.3, 0.5), body)
+	var sign := _box(Vector3(0.14, 0.1, 0.02), Vector3(0, 0.02 + h + 0.09, 0), _mat(TRIM, 0.3, 0.6), body)
+	for face in [1.0, -1.0]:
+		var hl := Label3D.new()
+		hl.text = "H"
+		hl.font = _font
+		hl.font_size = 64
+		hl.pixel_size = 0.0016
+		hl.modulate = INK
+		hl.outline_size = 0
+		hl.position = Vector3(0, 0, face * 0.011)
+		hl.rotation.y = 0.0 if face > 0 else PI
+		sign.add_child(hl)
+	node.set_meta("size", Vector3(w, h * 1.3, d))
+	return node
 
 
 func _building(base: Vector3, size: Vector3, color: Color, yaw: float) -> Node3D:
@@ -994,6 +1165,17 @@ func _construct(node: Node3D, delay: float) -> void:
 	tw.tween_property(body, "scale", Vector3.ONE, 0.7).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(scaffold, "scale", Vector3(1, 0.001, 1), 0.25).set_ease(Tween.EASE_IN)
 	tw.tween_callback(scaffold.queue_free)
+	tw.tween_callback(func(): if is_instance_valid(node): _sparkle(node.global_position + Vector3(0, size.y, 0)))
+	tw.tween_property(body, "scale", Vector3(1.12, 0.9, 1.12), 0.08)
+	tw.tween_property(body, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+## Destellos dorados al terminar una obra.
+func _sparkle(pos: Vector3) -> void:
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.018
+	mesh.height = 0.036
+	_burst(pos, mesh, Color("#ffd36b"), 16, 80.0, 1.4, true)
 
 
 func _demolish(node: Node3D) -> void:
@@ -1001,6 +1183,11 @@ func _demolish(node: Node3D) -> void:
 		node.queue_free()
 		return
 	_dust(node.global_position, 0.2)
+	var coin := CylinderMesh.new()
+	coin.top_radius = 0.035
+	coin.bottom_radius = 0.035
+	coin.height = 0.01
+	_burst(node.global_position + Vector3(0, 0.15, 0), coin, Color("#f2b84b"), 8, 30.0, 1.5, true)
 	var tw := create_tween()
 	tw.tween_property(node, "scale", Vector3(1.1, 0.001, 1.1), 0.35).set_ease(Tween.EASE_IN)
 	tw.tween_callback(node.queue_free)
@@ -1088,6 +1275,13 @@ func _on_event(ev: Dictionary) -> void:
 			_anim[int(ev["player"])]["queue"].append(BoardLayout.rect(int(ev["space"])).get_center())
 		"landed":
 			_highlight(int(ev["space"]))
+		"bought":
+			_claim(int(ev["space"]), int(ev["player"]))
+		"auction_ended":
+			if int(ev["winner"]) >= 0:
+				_claim(int(ev["space"]), int(ev["winner"]))
+		"built", "sold_building", "mortgaged", "unmortgaged":
+			_sync_space(int(ev["space"]))
 		"money":
 			var reason := String(ev["reason"])
 			if int(ev["delta"]) > 0 and (reason in ["Sueldo", "Bono por caer en la Salida", "Bote del Mirador", "Carta", "Bono turbo"] or reason.begins_with("Alquiler")):
@@ -1114,8 +1308,9 @@ func _highlight(i: int) -> void:
 
 func _on_drained() -> void:
 	_follow = -1
-	_cam_target = Vector3.ZERO
-	_cam_dist = 15.0
+	if not has_meta("fixed_cam"):
+		_cam_target = Vector3.ZERO
+		_cam_dist = 15.0
 	_refresh()
 
 
@@ -1249,6 +1444,10 @@ func _orient_signs(delta: float) -> void:
 
 
 func _animate_city() -> void:
+	for k in _flags.size():
+		var f: Node3D = _flags[k]
+		if f.is_visible_in_tree():
+			f.rotation.y = sin(_time * 3.0 + k) * 0.35
 	for c in _cabins:
 		var t := fposmod(_time * 0.05 + c["phase"], 1.0)
 		var ping := t * 2.0 if t < 0.5 else 2.0 - t * 2.0

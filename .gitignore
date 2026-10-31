@@ -1,0 +1,7 @@
+# Ejecutables exportados (se publican aparte, superan el límite de GitHub)
+*.exe
+*.apk
+*.apk.idsig
+*.aab
+/luchopolis_windows/
+/luchopolis-web/

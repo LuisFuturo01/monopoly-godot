@@ -5,6 +5,7 @@ extends Node
 ## - Los clientes envían comandos (_rpc_command) y reciben el estado completo + eventos (_rpc_sync).
 ## - Cada asiento se identifica por el UUID del perfil local: al reconectar, el jugador recupera su asiento.
 ## - Si un jugador se desconecta en partida, su asiento queda "desconectado" y la IA juega por él.
+## - Para volver a una partida empezada el anfitrión debe aceptar la solicitud (rejoin_requested).
 
 signal lobby_changed(seats: Array, rules: Dictionary)
 signal game_started(snapshot: Dictionary)
@@ -12,6 +13,10 @@ signal synced(snapshot: Dictionary, events: Array)
 signal command_received(cmd: Dictionary, sender_seats: Array)
 signal seat_connection_changed(seat: int, connected: bool)
 signal session_ended(reason: String)
+## Anfitrión: alguien pide recuperar su asiento en la partida en curso.
+signal rejoin_requested(peer_id: int, seat: int)
+## Cliente: la solicitud de volver espera la respuesta del anfitrión.
+signal rejoin_waiting
 
 enum Role { NONE, HOST, CLIENT }
 
@@ -27,6 +32,12 @@ var room_name := ""
 var last_address := ""
 ## Lo asigna el GameController anfitrión para reenviar el estado a quien reconecta.
 var snapshot_provider: Callable
+## Anfitrión: acepta sin preguntar (solo pruebas automáticas).
+var auto_approve_rejoin := false
+## Cliente: datos para volver a la última partida si la conexión se corta.
+var rejoin_info: Dictionary = {}
+
+var _pending_rejoin: Dictionary = {}   # peer -> asiento
 
 var _my_seat: Dictionary = {}
 
@@ -157,7 +168,30 @@ func send_command(cmd: Dictionary) -> void:
 		_rpc_command.rpc_id(1, cmd)
 
 
-func leave() -> void:
+## Responde a una solicitud de regreso: el jugador recupera su asiento o queda fuera.
+func approve_rejoin(peer_id: int, accept: bool) -> void:
+	if not is_host() or not _pending_rejoin.has(peer_id):
+		return
+	var i: int = _pending_rejoin[peer_id]
+	_pending_rejoin.erase(peer_id)
+	if not accept:
+		_rpc_rejected.rpc_id(peer_id, "El anfitrión no aceptó tu regreso a la partida")
+		return
+	seats[i]["peer"] = peer_id
+	seat_connection_changed.emit(i, true)
+	if snapshot_provider.is_valid():
+		_rpc_start.rpc_id(peer_id, snapshot_provider.call())
+
+
+func can_rejoin() -> bool:
+	return not rejoin_info.is_empty() and not is_online()
+
+
+## Salir a propósito borra la posibilidad de volver; un corte de red la conserva.
+func leave(forget_rejoin: bool = true) -> void:
+	if forget_rejoin:
+		rejoin_info = {}
+	_pending_rejoin.clear()
 	discovery.stop()
 	if adapter:
 		adapter.close()
@@ -179,6 +213,7 @@ func _on_peer_connected(_id: int) -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if not is_host():
 		return
+	_pending_rejoin.erase(id)
 	for i in range(seats.size() - 1, -1, -1):
 		if int(seats[i].get("peer", 0)) != id:
 			continue
@@ -196,13 +231,14 @@ func _on_connected_to_server() -> void:
 
 
 func _on_connection_failed() -> void:
-	leave()
+	leave(false)
 	session_ended.emit("No se pudo conectar con el anfitrión")
 
 
 func _on_server_disconnected() -> void:
-	leave()
-	session_ended.emit("Se perdió la conexión con el anfitrión")
+	var was_playing := in_game
+	leave(false)
+	session_ended.emit("Se perdió la conexión con el anfitrión." + (" Puedes pedir volver a la partida." if was_playing and can_rejoin() else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -217,13 +253,19 @@ func _rpc_hello(seat: Dictionary) -> void:
 	var uuid: String = seat.get("uuid", "")
 	for i in seats.size():
 		if seats[i].get("uuid", "") == uuid and uuid != "":
-			# Reconexión: recupera su asiento sin reiniciar la partida.
-			seats[i]["peer"] = sender
 			if in_game:
-				seat_connection_changed.emit(i, true)
-				if snapshot_provider.is_valid():
-					_rpc_start.rpc_id(sender, snapshot_provider.call())
+				# Reconexión en partida: el anfitrión decide si recupera su asiento.
+				if int(seats[i].get("peer", 0)) > 0:
+					_rpc_rejected.rpc_id(sender, "Tu asiento ya está conectado desde otro dispositivo")
+					return
+				_pending_rejoin[sender] = i
+				_rpc_waiting.rpc_id(sender)
+				if auto_approve_rejoin:
+					approve_rejoin(sender, true)
+				else:
+					rejoin_requested.emit(sender, i)
 			else:
+				seats[i]["peer"] = sender
 				_broadcast_lobby()
 			return
 	if in_game:
@@ -249,6 +291,8 @@ func _rpc_lobby(p_seats: Array, p_rules: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _rpc_start(snapshot: Dictionary) -> void:
 	in_game = true
+	if adapter:
+		rejoin_info = {"kind": adapter.kind(), "address": last_address}
 	game_started.emit(snapshot)
 
 
@@ -262,6 +306,11 @@ func _rpc_command(cmd: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _rpc_sync(snapshot: Dictionary, events: Array) -> void:
 	synced.emit(snapshot, events)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_waiting() -> void:
+	rejoin_waiting.emit()
 
 
 @rpc("authority", "call_remote", "reliable")
