@@ -334,12 +334,17 @@ func _build_board() -> void:
 		if corner:
 			var names := {"go": "SALIDA\n+Bs %d" % board.salary, "jail": "RETÉN", "free": "MIRADOR", "gotojail": "¡AL\nRETÉN!"}
 			if photo:
-				# Esquina con foto de fondo (cárcel, policía, mirador...) y un velo claro para leer el texto.
-				_tile_photo(photo, _w(r.get_center(), TOP + 0.001), ang, Vector2(along, along), Color(1, 1, 1, 0.82))
-			var cl := _label(names.get(sp["type"], sp["name"]), _w(r.get_center(), ty + 0.002), ang + PI / 4.0, 64, along * 1.2, INK)
-			if photo:
-				cl.outline_size = 16
-				cl.outline_modulate = Color.WHITE
+				# Esquina con la foto de fondo (cárcel de San Pedro, policía, mirador, La Paz).
+				_tile_photo(photo, _w(r.get_center(), TOP + 0.001), ang, Vector2(along, along), Color(1, 1, 1, 0.92))
+			# Franja de color en diagonal con el nombre, legible sobre cualquier foto.
+			var ccol: Color = UiKit.CORNERS.get(sp["type"], INK)
+			var strip := _box(Vector3(along * 1.32, 0.012, 0.46), _w(r.get_center(), TOP + 0.008), _mat(ccol, 0.4))
+			strip.rotation.y = -(ang + PI / 4.0)
+			var trim := _box(Vector3(along * 1.36, 0.01, 0.52), _w(r.get_center(), TOP + 0.006), _mat(Color.WHITE, 0.6))
+			trim.rotation.y = -(ang + PI / 4.0)
+			var cl := _label(names.get(sp["type"], sp["name"]), _w(r.get_center(), TOP + 0.016), ang + PI / 4.0, 56, along * 1.25, Color.WHITE)
+			cl.outline_size = 10
+			cl.outline_modulate = ccol.darkened(0.35)
 			_corner_prop(sp["type"], _w(r.get_center(), TOP), ang)
 			continue
 		var name_pos := r.get_center() + inward * (BoardLayout.CORNER / 2.0 - BoardLayout.BAND - 0.25)
@@ -1055,6 +1060,28 @@ func _claim(i: int, pid: int) -> void:
 		tw.tween_property(panel, "position:y", 0.82, 0.45).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 
 
+## Subasta: la casilla brilla tres veces, saltan destellos dorados y el cartel da brincos.
+func _auction_fx(i: int) -> void:
+	var r := BoardLayout.rect(i)
+	var spark := SphereMesh.new()
+	spark.radius = 0.03
+	spark.height = 0.06
+	_burst(_w(r.get_center(), TOP + 0.1), spark, Color("#ffd36b"), 40, 60.0, 2.6, true)
+	var tw := create_tween()
+	for k in 3:
+		tw.tween_callback(func(): _highlight(i))
+		tw.tween_interval(0.5)
+	if _sign_of.has(i):
+		var panel: Node3D = _sign_of[i]["panel"]
+		var bt := create_tween()
+		for k in 3:
+			bt.tween_property(panel, "position:y", 1.1, 0.14).set_ease(Tween.EASE_OUT)
+			bt.tween_property(panel, "position:y", 0.82, 0.22).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	if cinematic:
+		_cam_target = _w(r.get_center(), 0.3)
+		_cam_dist = 9.0
+
+
 ## Aplica el estado actual del motor a una sola casilla (en el momento de su evento).
 func _sync_space(i: int) -> void:
 	var e := controller.engine
@@ -1331,6 +1358,8 @@ func _on_event(ev: Dictionary) -> void:
 			_highlight(int(ev["space"]))
 		"bought":
 			_claim(int(ev["space"]), int(ev["player"]))
+		"auction_started":
+			_auction_fx(int(ev["space"]))
 		"auction_ended":
 			if int(ev["winner"]) >= 0:
 				_claim(int(ev["space"]), int(ev["winner"]))

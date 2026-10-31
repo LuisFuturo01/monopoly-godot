@@ -21,7 +21,9 @@ var _thread: Thread
 var _rng := RandomNumberGenerator.new()
 var _mrng := RandomNumberGenerator.new()   # solo para el hilo de música
 var _voice: AudioStreamPlayer
-var _voice_queue: Array = []
+var _voice_queue: Array = []        # cada elemento: Array de claves que se dicen seguidas
+var _voice_parts: Array = []        # partes que faltan de la frase en curso
+var _voice_priority := 0             # prioridad de la frase que está sonando
 var _voice_cache: Dictionary = {}
 var _last_said := ""
 var _last_said_at := 0
@@ -79,34 +81,51 @@ func play(sound: String, pitch_jitter: float = 0.0, volume_db: float = 0.0) -> v
 			return
 
 
-## Dice una frase del locutor (audio/voice/<voz>/<clave>.ogg). Si no existe, prueba `fallback`.
-## Las frases esperan su turno; si se acumulan, se descartan las más viejas para no
-## quedar atrasado respecto del juego.
-func say(key: String, delay: float = 0.0, fallback: String = "") -> void:
-	if Profile.voice_volume <= 0.01 or not is_inside_tree():
+## Dice una frase del locutor (audio/voice/<voz>/<clave>.ogg).
+func say(key: String, delay: float = 0.0, priority: int = 1) -> void:
+	say_parts([key], delay, priority)
+
+
+## Dice varias partes seguidas como una sola frase, p. ej. ["n_camilo", "a_adv_7"]
+## → «Camilo, ¡avanza siete!». Para no quedar atrasado respecto del juego:
+## - una frase más importante (`priority`) corta la que suena si es menos importante;
+## - solo espera una frase; la nueva reemplaza a la que esperaba.
+func say_parts(parts: Array, delay: float = 0.0, priority: int = 1) -> void:
+	if Profile.voice_volume <= 0.01 or not is_inside_tree() or parts.is_empty():
 		return
 	if delay > 0.0:
-		get_tree().create_timer(delay).timeout.connect(func(): say(key, 0.0, fallback))
+		get_tree().create_timer(delay).timeout.connect(func(): say_parts(parts, 0.0, priority))
 		return
-	if fallback != "" and _voice_stream(key) == null:
-		key = fallback
+	var key := "+".join(parts)
 	var now := Time.get_ticks_msec()
 	if key == _last_said and now - _last_said_at < 1500:
 		return
 	_last_said = key
 	_last_said_at = now
-	_voice_queue.append(key)
-	while _voice_queue.size() > 2:
-		_voice_queue.pop_front()
+	if _voice.playing and priority > _voice_priority:
+		_voice.stop()
+		_voice_parts.clear()
+		_voice_queue.clear()
+	# Solo espera una frase: la nueva la reemplaza salvo que la que esperaba sea más importante.
+	if _voice_queue.is_empty() or priority >= int(_voice_queue[0][0]):
+		_voice_queue = [[priority, parts.duplicate()]]
 	if not _voice.playing:
 		_next_voice()
 
 
+func has_voice(key: String) -> bool:
+	return _voice_stream(key) != null
+
+
 func _next_voice() -> void:
-	if _voice_queue.is_empty():
-		apply_volumes()
-		return
-	var stream := _voice_stream(_voice_queue.pop_front())
+	if _voice_parts.is_empty():
+		if _voice_queue.is_empty():
+			apply_volumes()
+			return
+		var item: Array = _voice_queue.pop_front()
+		_voice_priority = item[0]
+		_voice_parts = item[1].duplicate()
+	var stream := _voice_stream(_voice_parts.pop_front())
 	if stream == null:
 		_next_voice()
 		return

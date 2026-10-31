@@ -229,7 +229,7 @@ func _hud_test(panel: String) -> void:
 		"trade":
 			_hud._show_trade_composer()
 		"space":
-			_hud._show_space(6)
+			_hud._show_space(int(_args.get("i", "6")))
 		"deedback":
 			_hud._deed_back[6] = true
 			_hud._show_space(6)
@@ -239,6 +239,18 @@ func _hud_test(panel: String) -> void:
 			_hud._show_card({"deck": "destino", "text": "Ganaste el concurso de morenada de la Entrada del Gran Poder. Cobra Bs 100."})
 		"rejoin":
 			_hud._on_rejoin_request(5, 1)
+		"auctionfx":
+			await get_tree().create_timer(0.3).timeout
+			e.s["current"] = 1
+			e.s["phase"] = GameEngine.AUCTION
+			e.s["auction"] = {"space": 24, "bidders": [0, 1, 2], "turn": 0, "high": 0, "high_bidder": -1}
+			_controller.state_changed.emit()
+			_controller.player_events.push([{"type": "auction_started", "space": 24, "bidders": [0, 1, 2]}])
+			await get_tree().create_timer(2.2).timeout
+			e.s["auction"]["high"] = 150
+			e.s["auction"]["high_bidder"] = 2
+			_controller.player_events.push([{"type": "bid", "player": 2, "amount": 150}])
+			_controller.state_changed.emit()
 		"flow":
 			await get_tree().create_timer(0.5).timeout
 			_hud._on_event({"type": "money", "player": 0, "delta": -250, "reason": "Alquiler", "other": 1})

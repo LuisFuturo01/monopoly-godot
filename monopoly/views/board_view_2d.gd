@@ -250,7 +250,7 @@ func _draw_space(i: int) -> void:
 	if corner:
 		if photo:
 			_photo_rect(photo, box.grow(-3))
-			_rbox(box.grow(-3), Color(1, 1, 1, 0.55), 3)
+			_rbox(box.grow(-3), Color(1, 1, 1, 0.15), 3)
 		_draw_corner(i, sp, lw, lh)
 	elif photo:
 		var ph := Rect2(-lw / 2 + 4, y + 2, lw - 8, lh * 0.36)
@@ -313,10 +313,17 @@ func _draw_corner(i: int, sp: Dictionary, lw: float, lh: float) -> void:
 	var labels := {"go": "SALIDA\ncobra Bs %d" % controller.board.salary, "jail": "RETÉN\nde visita", "free": "MIRADOR", "gotojail": "¡AL\nRETÉN!"}
 	var icon := {"go": "»", "jail": "| | |", "free": "*", "gotojail": "!"}
 	var t: String = labels.get(sp["type"], sp["name"])
-	draw_multiline_string(_font_black, Vector2(-lw / 2 + 2, -lh / 2 + fs * 1.6), t, HORIZONTAL_ALIGNMENT_CENTER, lw - 4, fs, 3, INK)
-	draw_string(_font_black, Vector2(-lw / 2, lh * 0.34), icon.get(sp["type"], ""), HORIZONTAL_ALIGNMENT_CENTER, lw, fs * 2, Color("#d64550"))
+	var ccol: Color = UiKit.CORNERS.get(sp["type"], INK)
+	# Franja de color con el nombre en blanco, sobre la foto.
+	var lines := t.count("\n") + 1
+	var band := Rect2(-lw / 2 + 4, -fs * (lines * 0.65 + 0.35), lw - 8, fs * (lines * 1.3 + 0.7))
+	_rbox(Rect2(band.position + Vector2(2, 3), band.size), Color(0, 0, 0, 0.25), 6)
+	_rbox(band, ccol, 6, Color.WHITE, 2)
+	draw_multiline_string(_font_black, Vector2(band.position.x, band.position.y + fs * 1.15), t, HORIZONTAL_ALIGNMENT_CENTER, band.size.x, fs, lines, Color.WHITE)
 	if sp["type"] == "free" and controller.engine.rules.free_parking_pot:
-		draw_string(_font, Vector2(-lw / 2, lh / 2 - 6), "Bote Bs %d" % int(controller.engine.s["pot"]), HORIZONTAL_ALIGNMENT_CENTER, lw, fs, INK)
+		var pot := Rect2(-lw / 2 + 8, lh / 2 - fs * 2.0, lw - 16, fs * 1.6)
+		_rbox(pot, Color(1, 1, 1, 0.9), 5)
+		draw_string(_font_black, Vector2(pot.position.x, pot.end.y - fs * 0.4), "Bote Bs %d" % int(controller.engine.s["pot"]), HORIZONTAL_ALIGNMENT_CENTER, pot.size.x, fs, INK)
 
 
 func _icon_for(sp: Dictionary) -> String:

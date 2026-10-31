@@ -31,6 +31,7 @@ var _game_over_shown := false
 var _deed_back: Dictionary = {}      # casilla -> la tarjeta muestra el dorso
 var _banners := 0                    # avisos grandes visibles (para apilarlos)
 var _warned_round := -1
+var _last_high := -1                 # última puja vista (para animar cuando sube)
 
 
 func setup(c: GameController, view2d: BoardView2D, view3d: BoardView3D) -> void:
@@ -390,9 +391,20 @@ func _check_handoff(local: int) -> void:
 
 func _refresh_auction() -> void:
 	var en := e()
+	var was_visible := _auction_panel.visible
 	_auction_panel.visible = en.phase() == GameEngine.AUCTION
 	if not _auction_panel.visible:
+		_last_high = -1
 		return
+	if not was_visible:
+		# Entrada: el panel cae desde arriba y rebota.
+		_auction_panel.pivot_offset = _auction_panel.size / 2.0
+		_auction_panel.scale = Vector2(0.5, 0.5)
+		_auction_panel.modulate.a = 0.0
+		var tw := _auction_panel.create_tween().set_parallel(true)
+		# Entra cuando el aviso «¡SUBASTA!» ya se va retirando.
+		tw.tween_property(_auction_panel, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT).set_delay(1.3)
+		tw.tween_property(_auction_panel, "modulate:a", 1.0, 0.15).set_delay(1.3)
 	for child in _auction_panel.get_children():
 		child.queue_free()
 	var a: Dictionary = en.s["auction"]
@@ -408,7 +420,14 @@ func _refresh_auction() -> void:
 	v.add_child(head)
 	v.add_child(UiKit.label("Precio de lista Bs %d" % controller.board.price(i), 15, UiKit.MUTED))
 	var hb := int(a["high_bidder"])
-	v.add_child(UiKit.label("Puja más alta: %s" % ("Bs %d de %s" % [int(a["high"]), _plain(hb)] if hb >= 0 else "ninguna"), 18))
+	var high_l := UiKit.label("Puja más alta: %s" % ("Bs %d de %s" % [int(a["high"]), _plain(hb)] if hb >= 0 else "ninguna"), 20, UiKit.HEADING)
+	v.add_child(high_l)
+	if hb >= 0 and int(a["high"]) != _last_high:
+		_last_high = int(a["high"])
+		high_l.add_theme_color_override("font_color", Color.html(en.player(hb)["color"]).darkened(0.2))
+		high_l.resized.connect(func(): high_l.pivot_offset = high_l.size / 2.0, CONNECT_ONE_SHOT)
+		high_l.scale = Vector2(1.35, 1.35)
+		high_l.create_tween().tween_property(high_l, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	var names := []
 	for pid in a["bidders"]:
 		names.append(_plain(int(pid)))
@@ -617,41 +636,97 @@ func _show_space(i: int) -> void:
 	if b.is_property(i):
 		_show_property(i)
 		return
-	var head := PanelContainer.new()
-	head.add_theme_stylebox_override("panel", UiKit.box(b.space_color(i) if sp["type"] == "street" else UiKit.ACCENT, 16, 12, 14))
-	var hl := UiKit.label(String(sp["name"]).to_upper(), 22, Color.WHITE)
-	hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	head.add_child(hl)
-	v.add_child(head)
+	var col := UiKit.vbox(10)
+	col.add_child(_info_card(i))
+	col.add_child(UiKit.button("Cerrar", _close_modal))
+	_open_modal(UiKit.panel(col), "space", i)
+
+
+## Tarjeta de las casillas que no se compran (esquinas, cartas e impuestos), con el mismo
+## estilo que los títulos: foto o ilustración arriba, franja con el nombre y qué pasa al caer.
+func _info_card(i: int) -> Control:
+	var en := e()
+	var b := controller.board
+	var sp := b.space(i)
+	var col := _deed_color(i)
+	var width := minf(380.0, get_viewport_rect().size.x - 80.0)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UiKit.box(Color.WHITE, 22, 0, 0, col, 4, true))
+	card.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	var v := UiKit.vbox(0)
+	v.custom_minimum_size.x = width
+	card.add_child(v)
+	var tex := UiKit.place_photo(i, sp["name"])
+	var top := Control.new()
+	top.custom_minimum_size = Vector2(width, 150)
+	top.clip_contents = true
+	var photo := TextureRect.new()
+	photo.texture = tex if tex else UiKit.gradient_tex(col.lightened(0.25), col.darkened(0.3))
+	photo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	photo.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	top.add_child(photo)
+	if tex == null:
+		var icon := UiKit.label({"card": "?" if sp.get("deck", "") == "destino" else "!", "tax": "Bs"}.get(sp["type"], "★"), 84, Color.WHITE)
+		icon.add_theme_font_override("font", UiKit.font_black())
+		icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		top.add_child(icon)
+	v.add_child(top)
+	var titles := {"go": "SALIDA", "jail": "RETÉN", "free": "MIRADOR", "gotojail": "¡AL RETÉN!"}
+	v.add_child(_deed_band(titles.get(sp["type"], String(sp["name"]).to_upper()), col, 26))
+	var subtitles := {"jail": "Cárcel de San Pedro", "free": "Mirador Killi Killi", "go": "La Paz desde El Alto", "gotojail": "Policía Boliviana"}
+	var rows := UiKit.vbox(8)
+	v.add_child(_pad(rows, 20, 14))
+	if subtitles.has(sp["type"]):
+		var st := UiKit.label(subtitles[sp["type"]], 15, UiKit.MUTED)
+		st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rows.add_child(st)
+	var facts := []
 	match sp["type"]:
-		"street":
-			var r: Array = sp["rents"]
-			_row(v, "Alquiler", "Bs %d" % r[0])
-			_row(v, "Con el grupo completo", "Bs %d" % (int(r[0]) * 2))
-			for k in range(1, 5):
-				_row(v, "Con %d casa%s" % [k, "" if k == 1 else "s"], "Bs %d" % r[k])
-			_row(v, "Con hotel", "Bs %d" % r[5])
-			_row(v, "Cada casa cuesta", "Bs %d" % b.house_cost(i))
-		"transit":
-			for k in 4:
-				_row(v, "Con %d teleférico%s" % [k + 1, "" if k == 0 else "s"], "Bs %d" % sp["rents"][k])
-		"utility":
-			_row(v, "Con 1 servicio", "%d × dados" % sp["multipliers"][0])
-			_row(v, "Con ambos", "%d × dados" % sp["multipliers"][1])
-		"tax":
-			v.add_child(UiKit.label("Paga Bs %d al caer aquí." % int(sp["amount"]), 16, UiKit.TEXT, true))
-		"card":
-			v.add_child(UiKit.label("Roba una carta de %s." % ("Destino" if sp["deck"] == "destino" else "Cabildo"), 16, UiKit.TEXT, true))
 		"go":
-			v.add_child(UiKit.label("Cobra Bs %d cada vez que pases." % b.salary, 16, UiKit.TEXT, true))
+			facts.append("Cobras Bs %d cada vez que pasas por aquí." % b.salary)
+			if en.rules.double_salary_on_go:
+				facts.append("Si caes justo en la Salida cobras Bs %d." % (b.salary * 2))
 		"jail":
-			v.add_child(UiKit.label("Si solo estás de visita, no pasa nada.", 16, UiKit.TEXT, true))
+			facts.append("De visita: no pasa nada.")
+			facts.append("Preso: paga Bs %d, usa un salvoconducto o intenta sacar dobles." % b.jail_fine)
+			facts.append("Al tercer intento sin dobles pagas la multa y sales.")
 		"free":
-			v.add_child(UiKit.label("Descanso. Con la regla del bote, cobras lo acumulado.", 16, UiKit.TEXT, true))
+			facts.append("Descanso: aquí no pasa nada.")
+			if en.rules.free_parking_pot:
+				facts.append("Bote acumulado: Bs %d. Quien caiga aquí se lo lleva." % int(en.s["pot"]))
 		"gotojail":
-			v.add_child(UiKit.label("Vas directo al Retén sin cobrar sueldo.", 16, UiKit.TEXT, true))
-	v.add_child(UiKit.button("Cerrar", _close_modal))
-	_open_modal(UiKit.panel(v), "space", i)
+			facts.append("Vas directo al Retén, sin pasar por la Salida ni cobrar sueldo.")
+			facts.append("Sacar tres dobles seguidos también te manda al Retén.")
+		"card":
+			facts.append("Robas una carta de %s." % ("Destino" if sp["deck"] == "destino" else "Cabildo"))
+			facts.append("Puede darte dinero, cobrarte, moverte o mandarte al Retén.")
+		"tax":
+			facts.append("Pagas Bs %d al caer aquí." % int(sp["amount"]))
+			if en.rules.free_parking_pot:
+				facts.append("Lo que pagas va al bote del Mirador.")
+	for f in facts:
+		var row := UiKit.hbox(10)
+		var dot := UiKit.swatch(col, Vector2(10, 10))
+		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(dot)
+		var l := UiKit.label(f, 16, UiKit.TEXT, true)
+		l.custom_minimum_size.x = width - 70
+		row.add_child(l)
+		rows.add_child(row)
+	# Quién está ahora en la casilla
+	var here := HFlowContainer.new()
+	here.add_theme_constant_override("h_separation", 6)
+	for p in en.players():
+		if not p["bankrupt"] and int(controller.player_events.shown_pos.get(int(p["id"]), p["pos"])) == i:
+			var tag := "%s%s" % [Profile.label_for(p), " (preso)" if p["in_jail"] and sp["type"] == "jail" else ""]
+			here.add_child(UiKit.chip(tag, Color.html(p["color"])))
+	if here.get_child_count() > 0:
+		rows.add_child(UiKit.label("Aquí ahora:", 14, UiKit.MUTED))
+		rows.add_child(here)
+	return card
 
 
 ## Ficha de una propiedad: título de doble cara + acciones (comprar o gestionar).
@@ -1033,7 +1108,7 @@ func _deed_color(i: int) -> Color:
 			return UiKit.DESTINO if sp["deck"] == "destino" else UiKit.CABILDO
 		"tax":
 			return UiKit.DANGER
-	return UiKit.ACCENT_2
+	return UiKit.CORNERS.get(sp["type"], UiKit.ACCENT_2)
 
 
 ## Frente: foto del lugar y alquileres. Dorso: hipoteca, costos y estado.
@@ -1404,15 +1479,65 @@ func _bump(pid: int) -> void:
 	tw.tween_property(card, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
+## Destello de pantalla completa (subasta, Retén, quiebra...).
+func _flash(color: Color, strength: float = 0.35) -> void:
+	var r := ColorRect.new()
+	r.color = Color(color.r, color.g, color.b, strength)
+	r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(r)
+	var tw := r.create_tween()
+	tw.tween_property(r, "color:a", 0.0, 0.5).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(r.queue_free)
+
+
+## Rayos que giran detrás de un aviso importante.
+class Rays extends Control:
+	var color := Color.WHITE
+	func _process(delta: float) -> void:
+		rotation += delta * 0.8
+		queue_redraw()
+	func _draw() -> void:
+		var r := size.x / 2.0
+		var c := size / 2.0
+		for k in 12:
+			var a := TAU * k / 12.0
+			draw_colored_polygon(PackedVector2Array([c, c + Vector2.from_angle(a - 0.12) * r, c + Vector2.from_angle(a + 0.12) * r]), Color(color.r, color.g, color.b, 0.35))
+
+
+## Aviso grande con rayos, destello y un temblor (para los momentos importantes).
+func _big_banner(title: String, sub: String, color: Color) -> void:
+	_flash(color)
+	var vw := get_viewport_rect().size
+	var rays := Rays.new()
+	rays.color = color.lightened(0.3)
+	rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var d := minf(vw.x, vw.y) * 0.9
+	rays.size = Vector2(d, d)
+	rays.position = Vector2(vw.x / 2.0 - d / 2.0, vw.y * 0.32 - d / 2.0)
+	rays.pivot_offset = rays.size / 2.0
+	rays.scale = Vector2(0.2, 0.2)
+	add_child(rays)
+	move_child(rays, _auction_panel.get_index())   # detrás de los paneles, sobre el tablero
+	var tw := rays.create_tween()
+	tw.tween_property(rays, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(1.3)
+	tw.tween_property(rays, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(rays.queue_free)
+	_banner(title, sub, color, true)
+
+
 ## Aviso grande que aparece en el centro, rebota y se desvanece.
-func _banner(title: String, sub: String, color: Color) -> void:
+func _banner(title: String, sub: String, color: Color, big: bool = false) -> void:
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", UiKit.box(color, 26, 30, 14, Color.WHITE, 4, true))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var v := UiKit.vbox(2)
 	var fg := Color.WHITE if color.get_luminance() < 0.62 else UiKit.NAVY
-	var t := UiKit.label(title, 30, fg)
+	var t := UiKit.label(title, 44 if big else 30, fg)
 	t.add_theme_font_override("font", UiKit.font_black())
+	t.add_theme_constant_override("outline_size", 8 if big else 0)
+	t.add_theme_color_override("font_outline_color", color.darkened(0.35))
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
 	if sub != "":
@@ -1431,10 +1556,18 @@ func _banner(title: String, sub: String, color: Color) -> void:
 	p.position = Vector2((vw.x - p.size.x) / 2.0, vw.y * 0.3 - p.size.y / 2.0 + slot * (p.size.y + 10))
 	p.pivot_offset = p.size / 2.0
 	p.scale = Vector2(0.4, 0.4)
+	p.rotation = -0.08 if big else 0.0
 	var tw := p.create_tween()
 	tw.tween_property(p, "modulate:a", 1.0, 0.1)
-	tw.parallel().tween_property(p, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_interval(1.5)
+	tw.parallel().tween_property(p, "scale", Vector2.ONE, 0.45 if big else 0.35).set_trans(Tween.TRANS_ELASTIC if big else Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(p, "rotation", 0.0, 0.4).set_trans(Tween.TRANS_BACK)
+	if big:
+		# Temblor corto al «golpear» la pantalla.
+		var base_x := p.position.x
+		for k in 4:
+			tw.tween_property(p, "position:x", base_x + (8.0 if k % 2 == 0 else -8.0) * (1.0 - k * 0.2), 0.04)
+		tw.tween_property(p, "position:x", base_x, 0.04)
+	tw.tween_interval(0.9 if big else 1.5)
 	tw.tween_property(p, "modulate:a", 0.0, 0.35)
 	tw.parallel().tween_property(p, "position:y", p.position.y - 30, 0.35)
 	tw.tween_callback(func():
@@ -1493,9 +1626,39 @@ func _deed_fly(i: int, pid: int, stamp: String, stamp_color: Color) -> void:
 		card.queue_free())
 
 
+## Etiqueta que sube y se desvanece junto al panel de subasta (cada puja o retiro).
+func _bid_pop(pid: int, text: String, color: Color) -> void:
+	var chip := UiKit.chip(text, color)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(chip)
+	chip.modulate.a = 0.0
+	await get_tree().process_frame
+	if not is_instance_valid(chip) or not _auction_panel.visible:
+		chip.queue_free()
+		return
+	var r := _auction_panel.get_global_rect()
+	chip.global_position = Vector2(r.end.x - chip.size.x * 0.6, r.position.y + 20 + randf_range(0, 30))
+	chip.pivot_offset = chip.size / 2.0
+	chip.scale = Vector2(0.4, 0.4)
+	var tw := chip.create_tween()
+	tw.tween_property(chip, "modulate:a", 1.0, 0.08)
+	tw.parallel().tween_property(chip, "scale", Vector2(1.15, 1.15), 0.2).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(chip, "scale", Vector2.ONE, 0.1)
+	tw.tween_property(chip, "position:y", chip.position.y - 60, 0.9).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(chip, "modulate:a", 0.0, 0.9).set_delay(0.3)
+	tw.tween_callback(chip.queue_free)
+
+
 ## Animaciones según la acción: compras, hipotecas, subastas, tratos, Retén y quiebras.
 func _animate_event(ev: Dictionary) -> void:
 	match ev["type"]:
+		"bid":
+			_bid_pop(int(ev["player"]), "%s · Bs %d" % [_plain(int(ev["player"])), int(ev["amount"])], Color.html(e().player(int(ev["player"]))["color"]))
+		"bid_pass":
+			_bid_pop(int(ev["player"]), "%s se retira" % _plain(int(ev["player"])), UiKit.SOFT)
+		"dice_rolled":
+			if ev["double"]:
+				get_tree().create_timer(EventPlayer.DICE_TIME * 0.8).timeout.connect(func(): _banner("¡Dobles!", "Tira otra vez", UiKit.ACCENT_2))
 		"bought":
 			_deed_fly(int(ev["space"]), int(ev["player"]), "¡COMPRADO!", UiKit.GOOD)
 		"mortgaged":
@@ -1503,7 +1666,7 @@ func _animate_event(ev: Dictionary) -> void:
 		"unmortgaged":
 			_deed_fly(int(ev["space"]), int(ev["player"]), "LIBERADA", UiKit.ACCENT_2)
 		"auction_started":
-			_banner("¡Subasta!", _space_name(int(ev["space"])), UiKit.GOLD)
+			_big_banner("¡SUBASTA!", _space_name(int(ev["space"])), UiKit.GOLD)
 		"auction_ended":
 			if int(ev["winner"]) >= 0:
 				_deed_fly(int(ev["space"]), int(ev["winner"]), "¡VENDIDO!", UiKit.CORAL)
@@ -1514,7 +1677,7 @@ func _animate_event(ev: Dictionary) -> void:
 		"trade_resolved":
 			match ev["result"]:
 				"accepted":
-					_banner("¡Trato aceptado!", "%s y %s cerraron el negocio" % [_plain(int(ev["from"])), _plain(int(ev["to"]))], UiKit.GOOD)
+					_big_banner("¡Trato hecho!", "%s y %s cerraron el negocio" % [_plain(int(ev["from"])), _plain(int(ev["to"]))], UiKit.GOOD)
 				"rejected":
 					_banner("Trato rechazado", "%s no aceptó la propuesta" % _plain(int(ev["to"])), UiKit.DANGER)
 				"cancelled":
@@ -1522,18 +1685,18 @@ func _animate_event(ev: Dictionary) -> void:
 				"invalid":
 					_banner("Trato inválido", "Las condiciones ya no se cumplen", UiKit.MUTED)
 		"jailed":
-			_banner("¡Al Retén!", _plain(int(ev["player"])), UiKit.CORAL)
+			_big_banner("¡AL RETÉN!", _plain(int(ev["player"])), UiKit.CORAL)
 		"jail_released":
 			_banner("¡Libre!", "%s sale del Retén" % _plain(int(ev["player"])), UiKit.ACCENT_2)
 		"three_doubles":
-			_banner("¡Tres dobles!", "Directo al Retén", UiKit.DANGER)
+			_big_banner("¡TRES DOBLES!", "Directo al Retén", UiKit.DANGER)
 		"built":
 			if int(ev.get("houses", 0)) == GameEngine.HOTEL:
-				_banner("¡Hotel!", _space_name(int(ev["space"])), UiKit.DANGER)
+				_big_banner("¡HOTEL!", _space_name(int(ev["space"])), UiKit.DANGER)
 		"bankrupt":
-			_banner("¡Quiebra!", _plain(int(ev["player"])), UiKit.DANGER)
+			_big_banner("¡QUIEBRA!", _plain(int(ev["player"])), UiKit.DANGER)
 		"pot_collected":
-			_banner("¡Bote!", "%s se lleva Bs %d" % [_plain(int(ev["player"])), int(ev["amount"])], UiKit.GOLD)
+			_big_banner("¡BOTE!", "%s se lleva Bs %d" % [_plain(int(ev["player"])), int(ev["amount"])], UiKit.GOLD)
 		"turn_started":
 			var limit := e().rules.max_rounds
 			var rnd := int(ev.get("round", 0))

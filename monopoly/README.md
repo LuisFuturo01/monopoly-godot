@@ -113,8 +113,9 @@ volver» (buscar salas), y el anfitrión decide si acepta. Al aceptar recupera s
   `data/places/LEEME.md` lista los 40 nombres y cuáles faltan; para cambiar una foto basta
   reemplazar el archivo con el mismo nombre. Se ven en los carteles, en cada casilla (2D y 3D)
   y en el título de propiedad.
-- **Locutor**: frases en `audio/voice/<voz>/` generadas con Kokoro (Apache-2.0), con el
-  nombre de cada terreno («Ceja de El Alto, comprado», «Inicia la subasta de Plaza Murillo»);
+- **Locutor**: frases cortas en `audio/voice/<voz>/` generadas con Kokoro (Apache-2.0) que
+  dicen quién hace qué («Camilo, ¡avanza siete!», «Wilmer, ¡compra El Prado!»). Los nombres
+  grabados son ~150 comunes más los de la IA; si el tuyo no está, dice tu ficha («La llama»);
   ver `audio/voice/CREDITS.md` y `tools/gen_voice.py`. En Opciones se elige la voz (Dora o
   Alex) y el volumen del locutor (0 lo apaga).
 

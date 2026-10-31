@@ -250,6 +250,8 @@ func _rpc_hello(seat: Dictionary) -> void:
 	if not is_host():
 		return
 	var sender := multiplayer.get_remote_sender_id()
+	seat["name"] = Profile.clean_name(String(seat.get("name", "")))
+	seat["nick"] = Profile.clean_nick(String(seat.get("nick", "")))
 	var uuid: String = seat.get("uuid", "")
 	for i in seats.size():
 		if seats[i].get("uuid", "") == uuid and uuid != "":

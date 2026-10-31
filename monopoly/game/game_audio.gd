@@ -72,63 +72,118 @@ func _on_event(ev: Dictionary) -> void:
 			Sfx.play("alert")
 
 
-## Locutor: dice el resultado de los dados y lo importante de cada jugada.
+## Movimiento que sigue a una carta o al dado turbo (no es de los dados): pid -> true
+var _jump: Dictionary = {}
+## Ya se anunció «tres dobles»: no repetir que va al Retén
+var _three: Dictionary = {}
+
+
+## Clave del sujeto de la frase: el nombre del jugador si está grabado (nombres comunes y
+## los de la IA, ver tools/gen_voice.py); si no, su ficha («La llama»).
+func _subject(pid: int) -> String:
+	var p := controller.engine.player(pid)
+	var full := _norm(String(p["name"]))
+	if Sfx.has_voice("n_" + full):
+		return "n_" + full
+	var first := _norm(String(p["name"]).split(" ")[0])
+	if Sfx.has_voice("n_" + first):
+		return "n_" + first
+	return "n_ficha_" + String(p["token"])
+
+
+static func _norm(s: String) -> String:
+	s = s.to_lower()
+	for pair in [["á", "a"], ["é", "e"], ["í", "i"], ["ó", "o"], ["ú", "u"], ["ü", "u"], ["ñ", "n"]]:
+		s = s.replace(pair[0], pair[1])
+	var out := ""
+	for c in s:
+		out += c if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") else "_"
+	while out.contains("__"):
+		out = out.replace("__", "_")
+	return out.trim_prefix("_").trim_suffix("_")
+
+
+func _tell(pid: int, action: String, priority: int = 1) -> void:
+	Sfx.say_parts([_subject(pid), action], 0.0, priority)
+
+
+## Locutor: cuenta quién hace qué en cada jugada.
 func _announce(ev: Dictionary) -> void:
+	var pid := int(ev.get("player", -1))
 	match ev["type"]:
 		"dice_rolled":
-			var d: Array = ev["dice"]
-			Sfx.say("dice_%d" % (int(d[0]) + int(d[1])), EventPlayer.DICE_TIME * 0.9)
 			if ev["double"]:
-				Sfx.say("doubles", EventPlayer.DICE_TIME * 0.95)
-		"bought":
-			Sfx.say("bought_%d" % int(ev["space"]))
-		"mortgaged":
-			Sfx.say("mortgaged_%d" % int(ev["space"]))
-		"unmortgaged":
-			Sfx.say("unmortgaged_%d" % int(ev["space"]))
-		"sold_building":
-			Sfx.say("sold_%d" % int(ev["space"]))
-		"built":
-			Sfx.say(("hotel_%d" if int(ev.get("houses", 0)) == GameEngine.HOTEL else "house_%d") % int(ev["space"]))
-		"auction_started":
-			Sfx.say("auction_%d" % int(ev["space"]))
-		"auction_ended":
-			Sfx.say("auction_sold" if int(ev["winner"]) >= 0 else "no_buyer")
-		"rent_due":
-			Sfx.say("rent_%d" % int(ev["space"]) if ev.has("space") else "tax")
-		"tax_due":
-			Sfx.say("tax")
-		"money":
-			if ev["reason"] == "Sueldo":
-				Sfx.say("salary")
+				Sfx.say("g_doubles", EventPlayer.DICE_TIME * 0.55, 2)
 		"card_drawn":
-			Sfx.say("destino" if ev["deck"] == "destino" else "cabildo")
+			_jump[pid] = true
+			_tell(pid, "a_destino" if ev["deck"] == "destino" else "a_cabildo")
+		"speed_bolt":
+			_jump[pid] = true
+		"moved":
+			var path: Array = ev["path"]
+			if path.is_empty():
+				return
+			var back := int(path[0]) == posmod(int(ev["from"]) - 1, controller.board.size())
+			if back:
+				_tell(pid, "a_back_%d" % clampi(path.size(), 1, 5), 2)
+			elif _jump.get(pid, false):
+				_tell(pid, "a_goto_%d" % int(ev["to"]), 2)
+			else:
+				_tell(pid, "a_adv_%d" % clampi(path.size(), 1, 20), 2)
+			_jump.erase(pid)
+		"bought":
+			_tell(pid, "a_buy_%d" % int(ev["space"]), 2)
+		"rent_due":
+			_tell(pid, "a_rent")
+		"tax_due":
+			_tell(pid, "a_tax")
+		"mortgaged":
+			_tell(pid, "a_mort_%d" % int(ev["space"]))
+		"unmortgaged":
+			_tell(pid, "a_unmort_%d" % int(ev["space"]))
+		"sold_building":
+			_tell(pid, "a_sell_%d" % int(ev["space"]))
+		"built":
+			_tell(pid, ("a_hotel_%d" if int(ev.get("houses", 0)) == GameEngine.HOTEL else "a_house_%d") % int(ev["space"]))
+		"auction_started":
+			Sfx.say("g_auction_%d" % int(ev["space"]), 0.0, 3)
+		"auction_ended":
+			if int(ev["winner"]) >= 0:
+				_tell(int(ev["winner"]), "a_win_auction", 3)
+			else:
+				Sfx.say("g_no_buyer")
 		"three_doubles":
-			Sfx.say("three_doubles")
+			_three[pid] = true
+			Sfx.say("g_three_doubles", 0.0, 3)
 		"jailed":
-			Sfx.say("jail")
+			if not _three.get(pid, false):
+				_tell(pid, "a_jail", 3)
+			_three.erase(pid)
+			_jump.erase(pid)
 		"jail_released":
-			Sfx.say("jail_free")
+			_tell(pid, "a_jail_free")
 		"trade_proposed":
 			if controller.is_local_human(int(ev["to"])):
-				Sfx.say("trade_offer")
+				Sfx.say("g_trade_offer")
 		"trade_resolved":
 			if ev["result"] == "accepted":
-				Sfx.say("trade_ok")
+				Sfx.say("g_trade_ok")
 			elif ev["result"] == "rejected":
-				Sfx.say("trade_no")
+				Sfx.say("g_trade_no")
 		"bankrupt":
-			Sfx.say("bankrupt")
+			_tell(pid, "a_bankrupt", 3)
 		"pot_collected":
-			Sfx.say("pot")
+			_tell(pid, "a_pot")
 		"debt":
 			if controller.is_local_human(int(ev["debtor"])):
-				Sfx.say("debt")
+				_tell(int(ev["debtor"]), "a_debt")
 		"turn_started":
+			_jump.erase(pid)
 			var limit := controller.engine.rules.max_rounds
-			if limit > 0 and int(ev.get("round", 0)) == limit and int(ev["player"]) == controller.engine.active_players()[0]:
-				Sfx.say("last_round")
-			elif controller.is_local_human(int(ev["player"])):
-				Sfx.say("your_turn")
+			if limit > 0 and int(ev.get("round", 0)) == limit and pid == controller.engine.active_players()[0]:
+				Sfx.say("g_last_round")
+			elif controller.is_local_human(pid) and controller.local_humans().size() < controller.engine.active_players().size():
+				Sfx.say("g_your_turn")
 		"game_over":
-			Sfx.say("win")
+			if int(ev["winner"]) >= 0:
+				_tell(int(ev["winner"]), "a_wins", 3)

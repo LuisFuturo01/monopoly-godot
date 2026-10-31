@@ -5,6 +5,9 @@ extends Node
 signal settings_changed
 
 const PATH := "user://profile.cfg"
+const MAX_NAME_WORDS := 2
+const MAX_NAME_CHARS := 20
+const MAX_NICK_CHARS := 12
 const COLORS := ["#e04848", "#3d7be0", "#3fb36b", "#f0b429", "#9b59d0", "#ef7d3c", "#1fb5b5", "#e05aa8"]
 const TOKEN_NAMES := {
 	"llama": "Llama", "charango": "Charango", "cabina": "Cabina", "bombin": "Bombín",
@@ -50,6 +53,8 @@ func load_profile() -> void:
 		cinematic = cfg.get_value("settings", "cinematic", cinematic)
 		show_log = cfg.get_value("settings", "show_log", show_log)
 		rules = cfg.get_value("settings", "rules", rules)
+		display_name = clean_name(display_name)
+		nick = clean_nick(nick)
 	if uuid == "":
 		uuid = _new_uuid()
 		save_profile()
@@ -83,6 +88,19 @@ func apply_settings() -> void:
 
 func as_seat() -> Dictionary:
 	return {"uuid": uuid, "name": display_name, "nick": nick, "token": token, "color": color, "ai": -1}
+
+
+## Nombre de hasta dos palabras (cabe en las tarjetas y el locutor lo dice rápido).
+static func clean_name(s: String) -> String:
+	var words := s.strip_edges().split(" ", false)
+	var out := " ".join(words.slice(0, MAX_NAME_WORDS)).left(MAX_NAME_CHARS).strip_edges()
+	return out if out != "" else "Jugador"
+
+
+## Apodo de una sola palabra.
+static func clean_nick(s: String) -> String:
+	var words := s.strip_edges().split(" ", false)
+	return words[0].left(MAX_NICK_CHARS) if not words.is_empty() else ""
 
 
 static func label_for(p: Dictionary) -> String:

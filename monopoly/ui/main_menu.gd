@@ -253,23 +253,24 @@ func show_profile() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(right)
 	right.add_child(_title("Tu perfil", "Se guarda solo en este dispositivo"))
-	right.add_child(UiKit.label("Nombre", 15, UiKit.MUTED))
+	right.add_child(UiKit.label("Nombre (hasta 2 palabras)", 15, UiKit.MUTED))
 	var name_edit := LineEdit.new()
 	name_edit.text = Profile.display_name
-	name_edit.max_length = 18
+	name_edit.placeholder_text = "hasta 2 palabras"
+	UiKit.limit_words(name_edit, Profile.MAX_NAME_WORDS, Profile.MAX_NAME_CHARS)
 	right.add_child(name_edit)
-	right.add_child(UiKit.label("Apodo", 15, UiKit.MUTED))
+	right.add_child(UiKit.label("Apodo (una palabra)", 15, UiKit.MUTED))
 	var nick_edit := LineEdit.new()
 	nick_edit.text = Profile.nick
-	nick_edit.max_length = 14
-	nick_edit.placeholder_text = "opcional, aparece entre « »"
+	UiKit.limit_words(nick_edit, 1, Profile.MAX_NICK_CHARS)
+	nick_edit.placeholder_text = "opcional, una palabra"
 	right.add_child(nick_edit)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(spacer)
 	right.add_child(_footer(func(): show_home(), "Guardar", func():
-		Profile.display_name = name_edit.text.strip_edges() if name_edit.text.strip_edges() != "" else "Jugador"
-		Profile.nick = nick_edit.text.strip_edges()
+		Profile.display_name = Profile.clean_name(name_edit.text)
+		Profile.nick = Profile.clean_nick(nick_edit.text)
 		Profile.token = sel["token"]
 		Profile.color = sel["color"]
 		Profile.save_profile()
@@ -417,7 +418,8 @@ func _seat_card(idx: int) -> Control:
 	var name_edit := LineEdit.new()
 	name_edit.text = s["name"]
 	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_edit.text_changed.connect(func(t): s["name"] = t)
+	UiKit.limit_words(name_edit, Profile.MAX_NAME_WORDS, Profile.MAX_NAME_CHARS)
+	name_edit.text_changed.connect(func(_t): s["name"] = Profile.clean_name(name_edit.text))
 	row.add_child(name_edit)
 	if int(s["ai"]) >= 0:
 		row.add_child(_mini_segment(LEVELS, int(s["ai"]), func(i): s["ai"] = i))
@@ -426,7 +428,8 @@ func _seat_card(idx: int) -> Control:
 		nick.placeholder_text = "apodo"
 		nick.text = s["nick"]
 		nick.custom_minimum_size = Vector2(130, 0)
-		nick.text_changed.connect(func(t): s["nick"] = t)
+		UiKit.limit_words(nick, 1, Profile.MAX_NICK_CHARS)
+		nick.text_changed.connect(func(_t): s["nick"] = Profile.clean_nick(nick.text))
 		row.add_child(nick)
 	var remove := UiKit.button("✕", func():
 		_seats.remove_at(idx)

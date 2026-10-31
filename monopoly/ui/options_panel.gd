@@ -17,11 +17,11 @@ static func build(on_close: Callable) -> Control:
 		Sfx.play("coin")))
 	v.add_child(_slider("Locutor", "voice_volume", func():
 		Sfx.apply_volumes()
-		Sfx.say("dice_7")))
+		Sfx.say_parts(["n_camilo", "a_adv_7"])))
 	var voices := ["ef_dora", "em_alex"]
 	v.add_child(_segmented(["Voz de Dora", "Voz de Alex"], maxi(0, voices.find(Profile.voice_name)), func(i):
 		Profile.voice_name = voices[i]
-		Sfx.say("bought_29")))
+		Sfx.say_parts(["n_camilo", "a_buy_29"])))
 
 	v.add_child(_section("Tablero"))
 	v.add_child(_segmented(["Vista 3D", "Vista 2D"], 0 if Profile.view_mode == "3d" else 1, func(i):

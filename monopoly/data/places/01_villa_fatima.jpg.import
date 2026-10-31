@@ -3,15 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dw4hlrnhv8ib8"
-path="res://.godot/imported/01_villa_fatima.jpg-37b0acced460efec6434cc185fbe3883.ctex"
-metadata={
-"vram_texture": false
-}
+valid=false
 
 [deps]
 
 source_file="res://data/places/01_villa_fatima.jpg"
-dest_files=["res://.godot/imported/01_villa_fatima.jpg-37b0acced460efec6434cc185fbe3883.ctex"]
 
 [params]
 

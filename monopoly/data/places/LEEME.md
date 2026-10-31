@@ -7,10 +7,10 @@ Godot la importa sola al abrir el proyecto. Anota el autor y la licencia en `CRE
 
 | # | Casilla | Archivo | Estado |
 |---|---|---|---|
-| 0 | Salida | `00_salida.jpg` | falta (se usa un color) |
+| 0 | Salida | `00_salida.jpg` | ✓ tiene foto |
 | 1 | Villa Fátima | `01_villa_fatima.jpg` | ✓ tiene foto |
 | 2 | Cabildo | `02_cabildo.jpg` | falta (se usa un color) |
-| 3 | Achachicala | `03_achachicala.jpg` | falta (se usa un color) |
+| 3 | Achachicala | `03_achachicala.jpg` | ✓ tiene foto |
 | 4 | Teleférico Rojo | `04_teleferico_rojo.jpg` | ✓ tiene foto |
 | 5 | Tasa Municipal | `05_tasa_municipal.jpg` | falta (se usa un color) |
 | 6 | Chasquipampa | `06_chasquipampa.jpg` | ✓ tiene foto |
@@ -30,11 +30,11 @@ Godot la importa sola al abrir el proyecto. Anota el autor y la licencia en `CRE
 | 20 | Mirador | `20_mirador.jpg` | ✓ tiene foto |
 | 21 | El Prado | `21_el_prado.jpg` | ✓ tiene foto |
 | 22 | Destino | `22_destino.jpg` | falta (se usa un color) |
-| 23 | Av. Camacho | `23_av_camacho.jpg` | falta (se usa un color) |
+| 23 | Av. Camacho | `23_av_camacho.jpg` | ✓ tiene foto |
 | 24 | Plaza Murillo | `24_plaza_murillo.jpg` | ✓ tiene foto |
 | 25 | Teleférico Verde | `25_teleferico_verde.jpg` | ✓ tiene foto |
 | 26 | Ciudad Satélite | `26_ciudad_satelite.jpg` | ✓ tiene foto |
-| 27 | Villa Adela | `27_villa_adela.jpg` | falta (se usa un color) |
+| 27 | Villa Adela | `27_villa_adela.jpg` | ✓ tiene foto |
 | 28 | EPSAS | `28_epsas.jpg` | ✓ tiene foto |
 | 29 | Ceja de El Alto | `29_ceja_de_el_alto.jpg` | ✓ tiene foto |
 | 30 | ¡Al Retén! | `30_al_reten.jpg` | ✓ tiene foto |

@@ -22,6 +22,8 @@ const FONT_BOOST := 2
 const DESTINO := Color("#f08a3c")    # cartas y casillas de Destino
 const CABILDO := Color("#3d7be0")    # cartas y casillas de Cabildo
 const PLACES_DIR := "res://data/places/"
+## Color de cada esquina (franja del tablero y tarjeta al tocarla).
+const CORNERS := {"go": Color("#1f9e89"), "jail": Color("#e8735a"), "free": Color("#3d7be0"), "gotojail": Color("#d64550")}
 
 static var _theme: Theme
 static var _photos: Dictionary = {}
@@ -267,6 +269,24 @@ static func place_file(i: int, name: String) -> String:
 	while out.contains("__"):
 		out = out.replace("__", "_")
 	return "%02d_%s" % [i, out.trim_prefix("_").trim_suffix("_")]
+
+
+## Limita un campo de texto a `max_words` palabras mientras se escribe
+## (nombre: 2 palabras; apodo: 1, sin espacios).
+static func limit_words(edit: LineEdit, max_words: int, max_chars: int) -> void:
+	edit.max_length = max_chars
+	edit.text_changed.connect(func(t: String):
+		var clean := t
+		if max_words == 1:
+			clean = t.replace(" ", "")
+		else:
+			var words := t.split(" ", false)
+			if words.size() > max_words or (words.size() == max_words and t.ends_with(" ")):
+				clean = " ".join(words.slice(0, max_words))
+			clean = clean.replace("  ", " ").lstrip(" ")
+		if clean != t:
+			edit.text = clean
+			edit.caret_column = clean.length())
 
 
 ## Foto del lugar (data/places/NN_nombre.jpg o .png) o null si no hay.
