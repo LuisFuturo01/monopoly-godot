@@ -289,12 +289,12 @@ static func limit_words(edit: LineEdit, max_words: int, max_chars: int) -> void:
 			edit.caret_column = clean.length())
 
 
-## Foto del lugar (data/places/NN_nombre.jpg o .png) o null si no hay.
+## Foto del lugar (data/places/NN_nombre.jpg, .png o .webp) o null si no hay.
 static func place_photo(i: int, name: String) -> Texture2D:
 	var key := place_file(i, name)
 	if not _photos.has(key):
 		_photos[key] = null
-		for ext in [".jpg", ".png"]:
+		for ext in [".jpg", ".png", ".webp"]:
 			var path: String = PLACES_DIR + key + ext
 			if ResourceLoader.exists(path):
 				_photos[key] = load(path)

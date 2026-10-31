@@ -1,6 +1,8 @@
 # Fotos de las casillas
 
-Cada casilla busca aquí su foto con este nombre exacto: `NN_nombre.jpg` (o `.png`).
+Cada casilla busca aquí su foto con este nombre exacto: `NN_nombre.jpg` (o `.png` / `.webp`).
+**La extensión debe coincidir con el formato real**: una imagen WebP renombrada a `.jpg` no se
+importa y la casilla queda sin foto. Si descargas una `.webp`, guárdala como `NN_nombre.webp`.
 Para cambiar una foto, reemplaza el archivo manteniendo el nombre; para agregar una que falta,
 guárdala con el nombre de la tabla. Formato recomendado: horizontal, 512 px de ancho.
 Godot la importa sola al abrir el proyecto. Anota el autor y la licencia en `CREDITS.md`.
